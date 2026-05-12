@@ -892,15 +892,13 @@ export default function Home() {
     <main className="min-h-screen bg-[#f5f1e8] px-4 py-5 text-stone-950">
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <section className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_-18px_rgba(68,64,60,0.55)] ring-1 ring-stone-200">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
-            Pet behavior insight
-          </p>
-          <h1 className="mt-2 text-2xl font-bold leading-tight">
-            반려동물 마음코치
+          <h1 className="text-[1.8rem] font-bold leading-tight tracking-normal text-teal-700">
+            MomentPet
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-stone-600">
-            반려동물 사진 속 자세, 표정, 주변 상황을 보고 어떤 기분일
-            가능성이 있는지와 보호자가 취할 수 있는 반응을 알려드립니다.
+          <p className="mt-3 text-sm leading-relaxed text-stone-600">
+            반려동물 사진 속 자세와 표정, 주변 상황을 바탕으로 현재 어떤
+            상태에 가까워 보이는지와 보호자가 취할 수 있는 반응을
+            알려드립니다.
           </p>
         </section>
 

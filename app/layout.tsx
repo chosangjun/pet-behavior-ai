@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "반려동물 마음코치",
+  title: "MomentPet",
   description: "반려동물 사진 기반 행동 가능성 분석 앱",
 };
 
