@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { getPhotoTooLargeMessage, isFileTooLarge } from "@/app/uploadLimits";
 
 type BehaviorAnalysis = {
   mood: string;
@@ -79,6 +80,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (isFileTooLarge(image)) {
+      return NextResponse.json(
+        { error: getPhotoTooLargeMessage() },
+        { status: 413 },
+      );
+    }
+
     const imageUrl = await fileToDataUrl(image);
 
     const prompt = `
@@ -100,7 +108,7 @@ export async function POST(request: Request) {
 - 기대감
 
 결과 연결 규칙:
-- mood는 중심 상태를 한 문장으로 잡아주고, signals는 그 상태를 뒷받침하는 사진 속 단서만 말하세요.
+- mood는 중심 상태를 사용자에게 보여줄 자연스러운 문장형 설명으로 잡아주세요. "활발함", "불편/답답함" 같은 단어형 라벨만 쓰지 마세요.
 - possibleReason은 signals에서 이어지는 자연스러운 상황 해석이어야 하며, mood와 다른 이야기를 꺼내지 마세요.
 - guardianResponse는 같은 mood 흐름에 맞게 행동 제안을 하세요. 편안한 상태라면 과하게 조심시키지 말고, 긴장/경계 상태라면 지나치게 신나게 놀아주라는 방향을 피하세요.
 - cuteThought는 반드시 현재 중심 mood/state와 맞아야 합니다. 분석은 긴장인데 들뜬 말, 휴식인데 놀이를 조르는 말처럼 분위기가 충돌하면 안 됩니다.
@@ -139,7 +147,7 @@ cuteThought 규칙:
 JSON 형식:
 {
   "analysis": {
-    "mood": "지금 어떤 상태처럼 보이는지",
+    "mood": "반려동물이 어떤 상태에 가까워 보이는지 자연스럽게 설명한 한 문장",
     "signals": "사진 속 어떤 자세, 표정, 상황 단서가 그렇게 보였는지",
     "possibleReason": "이런 모습이 어떤 상황에서 자주 보이는지",
     "guardianResponse": "보호자가 지금 어떻게 해주면 좋을지",
@@ -206,7 +214,7 @@ function safeParseAnalysis(content: string): BehaviorAnalysis | null {
     if (!analysis) return null;
 
     const normalized = {
-      mood: polishKoreanSentence(String(analysis.mood ?? "")),
+      mood: normalizeMoodDescription(String(analysis.mood ?? "")),
       signals: polishKoreanSentence(String(analysis.signals ?? "")),
       possibleReason: polishKoreanSentence(String(analysis.possibleReason ?? "")),
       guardianResponse: polishKoreanSentence(
@@ -412,6 +420,50 @@ function polishCuteThought(text: string) {
     .replace(/해 줄래/g, "해줄래");
 
   return polished.length > 42 ? `${polished.slice(0, 40).trim()}...` : polished;
+}
+
+function normalizeMoodDescription(text: string) {
+  const polished = polishKoreanSentence(text);
+  const compact = polished.replace(/\s+/g, "");
+  const withoutPunctuation = compact.replace(/[.?!]/g, "");
+  const moodDescriptions: Record<string, string> = {
+    "긴장/불안": "조금 긴장한 상태에 가까워 보여요.",
+    긴장: "조금 긴장한 상태에 가까워 보여요.",
+    불안: "조금 긴장한 상태에 가까워 보여요.",
+    호기심: "주변에 호기심이 향한 모습이에요.",
+    편안함: "편안하게 머무는 분위기가 느껴져요.",
+    편안: "편안하게 머무는 분위기가 느껴져요.",
+    "휴식/졸림": "편안하게 쉬고 있는 분위기가 느껴져요.",
+    휴식: "편안하게 쉬고 있는 분위기가 느껴져요.",
+    졸림: "편안하게 쉬고 있는 분위기가 느껴져요.",
+    활발함: "반려동물이 활기차고 즐거운 기분을 나타내고 있어요.",
+    활발: "반려동물이 활기차고 즐거운 기분을 나타내고 있어요.",
+    "불편/답답함": "조금 불편하거나 답답한 상태에 가까워 보여요.",
+    불편: "조금 불편하거나 답답한 상태에 가까워 보여요.",
+    답답함: "조금 불편하거나 답답한 상태에 가까워 보여요.",
+    경계: "주변 상황을 조심스럽게 살피는 모습이에요.",
+    "관심집중": "주변에 관심이 집중된 모습이에요.",
+    "관심 집중": "주변에 관심이 집중된 모습이에요.",
+    안정감: "차분하고 안정된 분위기가 느껴져요.",
+    기대감: "무언가를 기대하며 기다리는 모습에 가까워요.",
+  };
+
+  if (moodDescriptions[withoutPunctuation]) {
+    return moodDescriptions[withoutPunctuation];
+  }
+
+  const isShortLabel =
+    !/[.?!]/.test(polished) &&
+    !/(보여요|느껴져요|있어요|가까워요|같아요|모습이에요|분위기예요|상태예요)$/.test(
+      polished,
+    ) &&
+    polished.length <= 12;
+
+  if (isShortLabel) {
+    return `${polished}에 가까운 모습이에요.`;
+  }
+
+  return polished;
 }
 
 function polishKoreanSentence(text: string) {

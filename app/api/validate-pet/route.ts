@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { getPhotoTooLargeMessage, isFileTooLarge } from "@/app/uploadLimits";
 
 const validationResponseFormat = {
   type: "json_schema" as const,
@@ -37,6 +38,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "이미지 파일이 필요합니다." },
         { status: 400 },
+      );
+    }
+
+    if (isFileTooLarge(image)) {
+      return NextResponse.json(
+        { error: getPhotoTooLargeMessage() },
+        { status: 413 },
       );
     }
 

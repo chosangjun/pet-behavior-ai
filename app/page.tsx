@@ -1,6 +1,11 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
+import {
+  PHOTO_UPLOAD_LIMIT_LABEL,
+  getPhotoTooLargeMessage,
+  isFileTooLarge,
+} from "./uploadLimits";
 
 type ValidationStatus = "idle" | "checking" | "valid" | "invalid";
 
@@ -497,7 +502,7 @@ function shuffleItems<T>(items: T[]) {
 }
 
 const PHOTO_TOO_LARGE_MESSAGE =
-  "사진 용량이 커서 분석이 중단됐어요. 사진을 한 번 캡처하거나 작은 사진으로 다시 올려주세요.";
+  getPhotoTooLargeMessage();
 
 const GENERAL_ANALYSIS_ERROR_MESSAGE =
   "사진을 분석하는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.";
@@ -663,8 +668,8 @@ export default function Home() {
     setUploadedFile(file);
     setAnalysis(null);
     setErrorMessage(null);
-    setValidationStatus("idle");
-    setValidationMessage(null);
+    setValidationStatus(isFileTooLarge(file) ? "invalid" : "idle");
+    setValidationMessage(isFileTooLarge(file) ? PHOTO_TOO_LARGE_MESSAGE : null);
     resetFollowUpState();
   };
 
@@ -818,6 +823,12 @@ export default function Home() {
   useEffect(() => {
     if (!uploadedFile) return;
 
+    if (isFileTooLarge(uploadedFile)) {
+      setValidationStatus("invalid");
+      setValidationMessage(PHOTO_TOO_LARGE_MESSAGE);
+      return;
+    }
+
     const allowedTypes = new Set([
       "image/jpeg",
       "image/jpg",
@@ -909,7 +920,8 @@ export default function Home() {
             구체적으로 분석할 수 있습니다.
           </p>
           <p className="mt-2 rounded-xl bg-teal-50 px-3 py-2 text-xs leading-relaxed text-teal-800">
-            업로드한 사진은 분석에만 사용되며 별도로 저장되지 않습니다.
+            최대 {PHOTO_UPLOAD_LIMIT_LABEL} 사진 업로드 가능하며, 업로드한
+            사진은 분석에만 사용되고 별도로 저장되지 않습니다.
           </p>
 
           <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-700 transition hover:border-teal-500 hover:bg-teal-50">
