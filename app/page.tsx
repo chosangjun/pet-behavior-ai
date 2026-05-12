@@ -508,12 +508,6 @@ const FOLLOW_UP_VALIDATION_MESSAGE =
 const MEANINGLESS_FOLLOW_UP_MESSAGE =
   FOLLOW_UP_VALIDATION_MESSAGE;
 
-const UNRELATED_FOLLOW_UP_MESSAGE =
-  FOLLOW_UP_VALIDATION_MESSAGE;
-
-const AMBIGUOUS_FOLLOW_UP_MESSAGE =
-  FOLLOW_UP_VALIDATION_MESSAGE;
-
 const awkwardPlaceholderPhrases = [
   "말 줄",
   "주는 편",
@@ -521,111 +515,6 @@ const awkwardPlaceholderPhrases = [
   "가는 편",
   "보는 편",
   "움직이는 편",
-];
-
-const ambiguousShortQuestions = [
-  "강아지",
-  "고양이",
-  "반려동물",
-  "동물",
-  "사진",
-  "행동",
-  "기분",
-  "상태",
-];
-
-const followUpRelatedKeywords = [
-  "강아지",
-  "고양이",
-  "반려",
-  "동물",
-  "사진",
-  "행동",
-  "기분",
-  "감정",
-  "상태",
-  "표정",
-  "자세",
-  "몸",
-  "눈",
-  "귀",
-  "꼬리",
-  "입",
-  "발",
-  "털",
-  "소리",
-  "짖",
-  "울",
-  "하악",
-  "으르렁",
-  "물",
-  "핥",
-  "배고",
-  "밥",
-  "먹",
-  "사료",
-  "우유",
-  "간식",
-  "불안",
-  "긴장",
-  "편안",
-  "불편",
-  "무서",
-  "놀",
-  "쉬",
-  "졸",
-  "졸려",
-  "졸린",
-  "잠",
-  "피곤",
-  "자",
-  "아파",
-  "아프",
-  "통증",
-  "힘들",
-  "만져",
-  "쓰다듬",
-  "안아",
-  "다가",
-  "기다",
-  "달래",
-  "보호자",
-  "주인",
-  "반응",
-  "해줘",
-  "줘도",
-  "괜찮",
-  "좋",
-  "나을",
-  "가까",
-  "보이나",
-  "보여",
-  "왜",
-  "뭐",
-  "무슨",
-  "어떻게",
-  "해도",
-  "돼",
-];
-
-const unrelatedFollowUpKeywords = [
-  "점심",
-  "저녁",
-  "아침",
-  "메뉴",
-  "번역",
-  "영어",
-  "비트코인",
-  "주식",
-  "코인",
-  "날씨",
-  "뉴스",
-  "대통령",
-  "숙제",
-  "코딩",
-  "노래",
-  "영화",
-  "여행",
 ];
 
 function isPayloadTooLargeError(message: string) {
@@ -670,18 +559,6 @@ function getFollowUpValidationError(question: string) {
     return MEANINGLESS_FOLLOW_UP_MESSAGE;
   }
 
-  if (isAmbiguousShortFollowUpQuestion(normalized)) {
-    return AMBIGUOUS_FOLLOW_UP_MESSAGE;
-  }
-
-  if (isUnrelatedFollowUpQuestion(normalized)) {
-    return UNRELATED_FOLLOW_UP_MESSAGE;
-  }
-
-  if (!hasFollowUpQuestionSignal(normalized)) {
-    return UNRELATED_FOLLOW_UP_MESSAGE;
-  }
-
   return null;
 }
 
@@ -702,37 +579,6 @@ function isMeaninglessFollowUpQuestion(question: string) {
   if (!/[가-힣a-zA-Z0-9]/.test(compact)) return true;
 
   return false;
-}
-
-function isAmbiguousShortFollowUpQuestion(question: string) {
-  const compact = question
-    .replace(/\s/g, "")
-    .replace(/[?!.~,요]+$/g, "")
-    .toLowerCase();
-
-  return ambiguousShortQuestions.includes(compact);
-}
-
-function isUnrelatedFollowUpQuestion(question: string) {
-  const compact = question.replace(/\s/g, "").toLowerCase();
-  const hasUnrelatedKeyword = unrelatedFollowUpKeywords.some((keyword) =>
-    compact.includes(keyword),
-  );
-  const hasRelatedKeyword = followUpRelatedKeywords.some((keyword) =>
-    compact.includes(keyword),
-  );
-
-  return hasUnrelatedKeyword && !hasRelatedKeyword;
-}
-
-function hasFollowUpQuestionSignal(question: string) {
-  const compact = question.replace(/\s/g, "").toLowerCase();
-
-  if (followUpRelatedKeywords.some((keyword) => compact.includes(keyword))) {
-    return true;
-  }
-
-  return /[?？]$/.test(question) && /[가-힣]/.test(question);
 }
 
 function getFriendlyFollowUpError(message: string) {
