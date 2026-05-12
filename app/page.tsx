@@ -920,8 +920,8 @@ export default function Home() {
             구체적으로 분석할 수 있습니다.
           </p>
           <p className="mt-2 rounded-xl bg-teal-50 px-3 py-2 text-xs leading-relaxed text-teal-800">
-            최대 {PHOTO_UPLOAD_LIMIT_LABEL} 사진 업로드 가능하며, 업로드한
-            사진은 분석에만 사용되고 별도로 저장되지 않습니다.
+            최대 {PHOTO_UPLOAD_LIMIT_LABEL} 사진 업로드 가능하며, 업로드한 사진은
+            분석에만 사용되고 별도로 저장되지 않습니다.
           </p>
 
           <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-700 transition hover:border-teal-500 hover:bg-teal-50">
