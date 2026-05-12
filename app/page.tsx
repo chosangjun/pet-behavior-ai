@@ -915,10 +915,10 @@ export default function Home() {
           </p>
 
           <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-700 transition hover:border-teal-500 hover:bg-teal-50">
-            사진 선택
+            사진 촬영 또는 선택
             <input
               type="file"
-              accept=".jpg,.jpeg,.png,.webp"
+              accept="image/*"
               onChange={handleUpload}
               className="sr-only"
             />
@@ -954,10 +954,10 @@ export default function Home() {
                 사진 제거
               </button>
               <label className="cursor-pointer rounded-xl bg-stone-200 px-4 py-3 text-center text-sm font-semibold text-stone-800 transition hover:bg-stone-300 active:scale-[0.98]">
-                다른 사진 선택
+                다른 사진 촬영 또는 선택
                 <input
                   type="file"
-                  accept=".jpg,.jpeg,.png,.webp"
+                  accept="image/*"
                   onChange={handleUpload}
                   className="sr-only"
                 />
