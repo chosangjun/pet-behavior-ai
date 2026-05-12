@@ -241,7 +241,7 @@ function getFollowUpMood(analysis?: BehaviorAnalysis | null): FollowUpMood {
     neutral: 0,
   };
 
-  if (hasSafetyCaution(analysis) || scores.alert > 0) return "alert";
+  if (hasRiskSignal(analysis) || scores.alert > 0) return "alert";
   if (scores.tense > 0 && scores.tense >= scores.active) return "tense";
 
   const moods: FollowUpMood[] = ["active", "resting", "curious", "tense"];
@@ -480,8 +480,10 @@ function getPlaceholderSimilarityWords(text: string) {
 }
 
 function hasSafetyCaution(analysis: BehaviorAnalysis) {
-  if (!analysis.caution.trim()) return false;
+  return analysis.caution.trim().length > 0;
+}
 
+function hasRiskSignal(analysis: BehaviorAnalysis) {
   const text = getAnalysisText(analysis);
   return riskSignalKeywords.some((keyword) => text.includes(keyword));
 }
