@@ -15,82 +15,167 @@ type BehaviorAnalysis = {
 
 type FollowUpMood = "active" | "tense" | "resting" | "curious" | "alert" | "neutral";
 
-const followUpMoodParts: Record<
-  FollowUpMood,
-  {
-    starts: string[];
-    focuses: string[];
-    endings: string[];
-  }
-> = {
-  active: {
-    starts: ["지금처럼 신나 보이면", "놀고 싶은 분위기라면", "기분이 올라와 보일 때", "활발해 보이는 상태라면"],
-    focuses: ["더 놀아줘도 괜찮은 상태", "장난감을 꺼내도 좋은 분위기", "같이 움직여줘도 좋은 타이밍", "기분이 올라온 상태"],
-    endings: ["일까요?", "에 가까울까요?", "로 보면 될까요?"],
-  },
-  tense: {
-    starts: ["조금 긴장해 보이면", "낯설어하는 분위기라면", "아직 마음을 살피는 중이면", "편해지기 전이라면"],
-    focuses: ["잠시 기다려주는 게", "천천히 다가가는 게", "조용히 지켜보는 게", "거리를 조금 두는 게"],
-    endings: ["이 나을까요?", "이 더 편할까요?", "이 좋을까요?"],
-  },
-  resting: {
-    starts: ["쉬고 싶은 분위기라면", "졸려 보이는 상태라면", "편하게 늘어져 있다면", "움직임이 적어 보이면"],
-    focuses: ["지금은 쉬게 두는 게", "조용히 기다려주는 게", "만지는 건 나중으로 미루는 게", "잠깐 지켜만 보는 게"],
-    endings: ["이 좋을까요?", "이 더 편할까요?", "이 나을까요?"],
-  },
-  curious: {
-    starts: ["궁금해하는 분위기라면", "주변을 살피는 중이면", "관심이 생긴 모습이라면", "가까이 확인하고 싶은 상태라면"],
-    focuses: ["천천히 맡아보게 두는 게", "스스로 다가오게 기다리는 게", "가볍게 말을 걸어보는 게", "새로운 것을 살펴보게 두는 게"],
-    endings: ["이 좋을까요?", "이 괜찮을까요?", "에 가까울까요?"],
-  },
-  alert: {
-    starts: ["경계하는 분위기라면", "예민하게 살피는 중이면", "불편한 신호가 섞여 보이면", "아직 안심하지 못한 상태라면"],
-    focuses: ["다가가지 않고 기다리는 게", "공간을 조금 비워주는 게", "자극을 줄여주는 게", "천천히 거리를 두는 게"],
-    endings: ["이 좋을까요?", "이 더 나을까요?", "이 편할까요?"],
-  },
-  neutral: {
-    starts: ["이 분위기라면", "사진 속 모습만 보면", "지금 상태에서는", "방금 반응을 보면"],
-    focuses: ["조금 더 지켜보는 게", "부드럽게 말을 걸어보는 게", "반응을 살핀 뒤 움직이는 게", "편하게 두는 게"],
-    endings: ["이 좋을까요?", "이 나을까요?", "에 가까울까요?"],
-  },
+type FollowUpCategory =
+  | "distance"
+  | "play"
+  | "activity"
+  | "touch"
+  | "calm"
+  | "rest"
+  | "curiosity"
+  | "snack"
+  | "guardian"
+  | "environment";
+
+const followUpCategoriesByMood: Record<FollowUpMood, FollowUpCategory[]> = {
+  active: ["play", "activity", "guardian", "snack", "touch"],
+  tense: ["distance", "calm", "environment", "guardian", "touch"],
+  resting: ["rest", "touch", "calm", "distance", "guardian"],
+  curious: ["curiosity", "environment", "guardian", "activity", "snack"],
+  alert: ["distance", "calm", "environment", "touch", "guardian"],
+  neutral: ["guardian", "curiosity", "rest", "play", "environment", "distance"],
 };
 
-const naturalFollowUpQuestions: Record<FollowUpMood, string[]> = {
-  active: [
-    "나랑 조금만 더 놀고 싶은 걸까요?",
-    "장난감을 꺼내줘도 괜찮을까요?",
-    "지금 같이 움직여줘도 좋을까요?",
-    "조금 더 놀아줘도 될까요?",
+const naturalFollowUpQuestions: Record<FollowUpCategory, string[]> = {
+  distance: [
+    "조금 더 기다려주는 편이 좋을까요?",
+    "한 발짝 물러나 있으면 더 괜찮을까요?",
+    "먼저 다가올 때까지 놔둘까요?",
+    "지금은 거리를 살짝 두는 게 나을까요?",
+    "눈을 덜 마주치면 부담이 줄까요?",
+    "가까이 가지 말고 옆에만 있어줄까요?",
+    "다가가기보다 가만히 있어도 될까요?",
+    "혼자 생각할 시간을 주는 게 좋을까요?",
+    "잠깐 모른 척해주면 더 편해질까요?",
+    "손을 내밀기 전에 기다려볼까요?",
+    "지금은 따라가지 않는 게 나을까요?",
+    "먼저 냄새 맡게 두는 게 좋을까요?",
   ],
-  tense: [
-    "조금 떨어져서 기다려줄까요?",
-    "천천히 다가가도 괜찮을까요?",
-    "지금은 조용히 지켜보는 게 좋을까요?",
-    "편해질 때까지 기다려줄까요?",
+  play: [
+    "지금은 같이 놀아줘도 괜찮을까요?",
+    "장난감을 보여주면 좋아할까요?",
+    "짧게 놀아주면 기분이 풀릴까요?",
+    "공놀이를 해도 신나할 것 같나요?",
+    "터그 놀이를 살짝 해봐도 될까요?",
+    "먼저 장난감을 흔들어볼까요?",
+    "놀자고 부르면 반가워할까요?",
+    "가볍게 놀아주면 더 활기날까요?",
+    "사냥 놀이처럼 움직여줘도 될까요?",
+    "지금 에너지를 조금 빼줘도 좋을까요?",
+    "놀이를 시작해도 무리 없을까요?",
+    "짧고 신나는 놀이가 맞을까요?",
   ],
-  resting: [
-    "지금은 쉬게 두는 게 좋을까요?",
-    "잠깐 지켜만 봐도 괜찮을까요?",
-    "만지는 건 조금 나중에 할까요?",
-    "조용히 기다려주는 게 나을까요?",
+  activity: [
+    "산책 가면 더 좋아할 것 같나요?",
+    "잠깐 바깥 공기를 쐬면 나아질까요?",
+    "몸을 조금 움직이면 기분이 바뀔까요?",
+    "가벼운 산책을 제안해도 될까요?",
+    "실내에서 짧게 움직여볼까요?",
+    "조금 걸으면 답답함이 풀릴까요?",
+    "활동을 늘리면 더 차분해질까요?",
+    "창가 쪽으로 같이 가봐도 될까요?",
+    "짧은 놀이 후 쉬게 하면 좋을까요?",
+    "평소 루틴대로 움직여도 괜찮을까요?",
+    "잠깐 자리 이동을 해볼까요?",
+    "기분 전환을 도와주면 좋을까요?",
   ],
-  curious: [
-    "여기 한번 봐줘도 될까요?",
-    "스스로 다가오게 기다려줄까요?",
-    "가볍게 말을 걸어봐도 괜찮을까요?",
-    "조금 더 가까이 와줄까요?",
+  touch: [
+    "지금 만져도 괜찮은 분위기일까요?",
+    "머리보다 몸 옆을 살짝 만져볼까요?",
+    "쓰다듬는 건 나중이 나을까요?",
+    "손을 가까이 대도 부담 없을까요?",
+    "안아주기보다 옆에 있어줄까요?",
+    "턱 밑을 살짝 만져봐도 될까요?",
+    "등을 천천히 쓰다듬어도 좋을까요?",
+    "만지기 전에 냄새 맡게 해줄까요?",
+    "스킨십은 짧게만 하는 게 맞을까요?",
+    "지금은 손대지 않는 게 나을까요?",
+    "먼저 몸을 기대올 때까지 기다릴까요?",
+    "가벼운 쓰다듬음은 괜찮아 보이나요?",
   ],
-  alert: [
-    "지금은 거리를 조금 두는 게 좋을까요?",
-    "다가가지 않고 기다려줄까요?",
-    "자극을 줄여주는 게 나을까요?",
-    "공간을 조금 비워줄까요?",
+  calm: [
+    "조용한 공간이 더 편할까요?",
+    "조금 긴장한 상태에 가까워 보이나요?",
+    "불을 살짝 낮추면 안정될까요?",
+    "말을 줄이고 있어주면 나을까요?",
+    "소리를 줄여주면 덜 예민해질까요?",
+    "천천히 숨 고를 시간을 줄까요?",
+    "차분한 목소리로 불러볼까요?",
+    "담요나 방석을 가까이 둬볼까요?",
+    "낯선 자극을 치워주는 게 좋을까요?",
+    "지금은 안정감을 먼저 주면 될까요?",
+    "편한 자리로 안내해도 괜찮을까요?",
+    "조용히 옆에 있어주는 게 맞을까요?",
   ],
-  neutral: [
-    "조금 더 지켜봐도 괜찮을까요?",
-    "부드럽게 말을 걸어볼까요?",
-    "지금은 편하게 두는 게 좋을까요?",
-    "반응을 보고 천천히 움직일까요?",
+  rest: [
+    "편하게 쉬게 두는 게 좋을까요?",
+    "졸린 신호로 봐도 될까요?",
+    "잠깐 낮잠 자게 놔둘까요?",
+    "지금은 깨우지 않는 게 나을까요?",
+    "쉬는 시간을 더 주면 좋을까요?",
+    "담요를 덮어주면 싫어하지 않을까요?",
+    "눕기 좋은 자리를 만들어줄까요?",
+    "놀자고 부르지 않는 게 맞을까요?",
+    "가만히 쉬고 싶은 마음일까요?",
+    "휴식 모드로 봐도 괜찮을까요?",
+    "조용히 자리를 비켜줄까요?",
+    "오늘은 무리하지 않는 게 좋을까요?",
+  ],
+  curiosity: [
+    "낯선 냄새를 궁금해하는 걸까요?",
+    "새로운 소리에 관심이 생긴 걸까요?",
+    "스스로 확인하게 두면 좋을까요?",
+    "조금 더 탐색하게 놔둘까요?",
+    "처음 보는 물건이 신경 쓰이나요?",
+    "주변을 알아보는 중일까요?",
+    "가까이 가서 냄새 맡고 싶은 걸까요?",
+    "궁금해서 멈춰 있는 걸까요?",
+    "확인할 시간을 주는 게 좋을까요?",
+    "낯설지만 관심은 있는 걸까요?",
+    "먼저 살펴보게 두면 괜찮을까요?",
+    "호기심이 더 큰 상태로 보이나요?",
+  ],
+  snack: [
+    "간식을 조금 줘도 괜찮을까요?",
+    "배고파서 관심을 보이는 걸까요?",
+    "사료 시간을 기다리는 걸까요?",
+    "간식보다 물을 먼저 챙겨볼까요?",
+    "먹을 걸 기대하는 눈빛일까요?",
+    "작은 보상 간식이 도움이 될까요?",
+    "지금 간식으로 달래도 될까요?",
+    "밥그릇 쪽을 확인해볼까요?",
+    "훈련 간식을 꺼내면 집중할까요?",
+    "배가 고픈 신호일 수도 있을까요?",
+    "먹는 것보다 관심이 필요한 걸까요?",
+    "간식은 조금만 주는 게 맞을까요?",
+  ],
+  guardian: [
+    "지금은 관심을 받고 싶은 걸까요?",
+    "보호자 반응을 기다리는 걸까요?",
+    "이름을 부르면 좋아할까요?",
+    "눈을 맞추고 말 걸어도 될까요?",
+    "옆에 앉아 있으면 안심할까요?",
+    "칭찬해주면 더 좋아질까요?",
+    "제가 먼저 다가가도 될까요?",
+    "가볍게 말을 걸면 반응할까요?",
+    "보호자를 확인하려는 모습일까요?",
+    "안심시키는 말이 도움이 될까요?",
+    "관심을 조금 더 줘도 괜찮을까요?",
+    "혼자 두기보다 함께 있어줄까요?",
+  ],
+  environment: [
+    "낯선 장소라 조심하는 걸까요?",
+    "주변 소리가 신경 쓰이는 걸까요?",
+    "공간을 조금 정리해주면 좋을까요?",
+    "익숙한 물건을 곁에 둬볼까요?",
+    "새로운 환경에 적응하는 중일까요?",
+    "사람이 적은 곳이 더 나을까요?",
+    "문 쪽 움직임을 신경 쓰는 걸까요?",
+    "바닥 느낌이 어색한 걸까요?",
+    "냄새가 바뀌어서 확인하는 걸까요?",
+    "조용한 방으로 옮겨볼까요?",
+    "익숙한 자리로 데려가도 될까요?",
+    "환경이 바뀐 게 영향을 준 걸까요?",
   ],
 };
 
@@ -131,7 +216,7 @@ function getFollowUpPlaceholder(
   const mood = getFollowUpMood(analysis);
   const candidates = buildFollowUpCandidates(mood, analysis);
   const freshCandidates = candidates.filter(
-    (candidate) => !recentPlaceholders.includes(candidate),
+    (candidate) => !isRecentlyUsedPlaceholder(candidate, recentPlaceholders),
   );
   const source = freshCandidates.length > 0 ? freshCandidates : candidates;
 
@@ -165,22 +250,16 @@ function buildFollowUpCandidates(
   mood: FollowUpMood,
   analysis?: BehaviorAnalysis | null,
 ) {
-  const parts = followUpMoodParts[mood];
   const analysisText = analysis ? normalizeQuestionText(getAnalysisText(analysis)) : "";
-  const composedCandidates = parts.starts.flatMap((start) =>
-    parts.focuses.flatMap((focus) =>
-      parts.endings.map((ending) =>
-        normalizeQuestion(`${start} ${focus}${ending}`),
-      ),
-    ),
+  const categories = followUpCategoriesByMood[mood];
+  const fallbackCategories = mood === "neutral" ? [] : followUpCategoriesByMood.neutral;
+  const candidates = [...categories, ...fallbackCategories].flatMap((category) =>
+    naturalFollowUpQuestions[category].map(normalizeQuestion),
   );
-  const candidates = [
-    ...naturalFollowUpQuestions[mood].map(normalizeQuestion),
-    ...composedCandidates,
-  ];
   const deduped = [...new Set(candidates)].filter(
     (candidate) =>
       !isDuplicateWithAnalysis(candidate, analysisText) &&
+      !isTooSimilarToAnalysis(candidate, analysisText) &&
       isNaturalFollowUpPlaceholder(candidate),
   );
 
@@ -333,6 +412,66 @@ function isDuplicateWithAnalysis(candidate: string, analysisText: string) {
     normalizedCandidate.length > 8 &&
     analysisText.includes(normalizedCandidate)
   );
+}
+
+function isTooSimilarToAnalysis(candidate: string, analysisText: string) {
+  if (!analysisText) return false;
+
+  const candidateWords = getMeaningfulQuestionWords(candidate);
+  if (candidateWords.length < 4) return false;
+
+  const overlapCount = candidateWords.filter((word) =>
+    analysisText.includes(normalizeQuestionText(word)),
+  ).length;
+
+  return overlapCount >= 4 && overlapCount / candidateWords.length >= 0.75;
+}
+
+function isRecentlyUsedPlaceholder(
+  candidate: string,
+  recentPlaceholders: string[],
+) {
+  return recentPlaceholders.some(
+    (recent) =>
+      candidate === recent || getPlaceholderSimilarity(candidate, recent) >= 0.42,
+  );
+}
+
+function getPlaceholderSimilarity(first: string, second: string) {
+  const firstWords = new Set(getPlaceholderSimilarityWords(first));
+  const secondWords = new Set(getPlaceholderSimilarityWords(second));
+  const union = new Set([...firstWords, ...secondWords]);
+  if (union.size === 0) return 0;
+
+  const sharedCount = [...firstWords].filter((word) => secondWords.has(word)).length;
+  return sharedCount / union.size;
+}
+
+function getPlaceholderSimilarityWords(text: string) {
+  const weakWords = new Set([
+    "지금",
+    "조금",
+    "살짝",
+    "먼저",
+    "더",
+    "있는",
+    "하는",
+    "주는",
+    "두는",
+    "좋을",
+    "나을",
+    "괜찮",
+    "될까",
+    "까요",
+  ]);
+
+  return getMeaningfulQuestionWords(text)
+    .map((word) =>
+      word
+        .replace(/(할까요|볼까요|될까요|일까요|까요|나요|어요|해도|줘도|하면|으로|처럼|까지)$/g, "")
+        .replace(/(해주|해볼|봐도|두면|두는|주는|주면)$/g, ""),
+    )
+    .filter((word) => word.length >= 2 && !weakWords.has(word));
 }
 
 function hasSafetyCaution(analysis: BehaviorAnalysis) {
@@ -643,7 +782,7 @@ export default function Home() {
     );
     setFollowUpPlaceholder(nextPlaceholder);
     setRecentFollowUpPlaceholders((recent) =>
-      [nextPlaceholder, ...recent].slice(0, 10),
+      [nextPlaceholder, ...recent].slice(0, 24),
     );
   };
 
