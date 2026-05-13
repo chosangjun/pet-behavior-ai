@@ -1,10 +1,9 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import {
-  PHOTO_UPLOAD_LIMIT_LABEL,
+  MAX_UPLOAD_SIZE_BYTES,
   getPhotoTooLargeMessage,
-  isFileTooLarge,
 } from "./uploadLimits";
 
 type ValidationStatus = "idle" | "checking" | "valid" | "invalid";
@@ -506,6 +505,16 @@ function shuffleItems<T>(items: T[]) {
 const PHOTO_TOO_LARGE_MESSAGE =
   getPhotoTooLargeMessage();
 
+const COMPRESSED_IMAGE_TARGET_BYTES = Math.floor(MAX_UPLOAD_SIZE_BYTES * 0.9);
+const IMAGE_COMPRESSION_STEPS = [
+  { maxDimension: 1536, quality: 0.84 },
+  { maxDimension: 1536, quality: 0.76 },
+  { maxDimension: 1360, quality: 0.76 },
+  { maxDimension: 1280, quality: 0.7 },
+  { maxDimension: 1120, quality: 0.68 },
+  { maxDimension: 960, quality: 0.64 },
+];
+
 const GENERAL_ANALYSIS_ERROR_MESSAGE =
   "사진을 분석하는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.";
 
@@ -609,7 +618,7 @@ export default function Home() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<BehaviorAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isPreparingPhoto, setIsPreparingPhoto] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -627,6 +636,7 @@ export default function Home() {
   const [followUpPlaceholder, setFollowUpPlaceholder] = useState(
     getFollowUpPlaceholder(),
   );
+  const uploadRequestIdRef = useRef(0);
 
   const refreshFollowUpPlaceholder = (nextAnalysis?: BehaviorAnalysis | null) => {
     const nextPlaceholder = getFollowUpPlaceholder(
@@ -649,47 +659,82 @@ export default function Home() {
   };
 
   const resetPhotoState = () => {
+    uploadRequestIdRef.current += 1;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setUploadedFile(null);
     setAnalysis(null);
     setErrorMessage(null);
+    setIsPreparingPhoto(false);
     setValidationStatus("idle");
     setValidationMessage(null);
     resetFollowUpState();
   };
 
-  const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
+    const uploadRequestId = uploadRequestIdRef.current + 1;
+    uploadRequestIdRef.current = uploadRequestId;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
 
     setPreviewUrl(URL.createObjectURL(file));
-    setUploadedFile(file);
+    setUploadedFile(null);
     setAnalysis(null);
     setErrorMessage(null);
-    setValidationStatus(isFileTooLarge(file) ? "invalid" : "idle");
-    setValidationMessage(isFileTooLarge(file) ? PHOTO_TOO_LARGE_MESSAGE : null);
+    setIsPreparingPhoto(true);
+    setValidationStatus("checking");
+    setValidationMessage("사진을 분석하기 좋은 크기로 조정하고 있어요...");
     resetFollowUpState();
+
+    try {
+      const optimizedFile = await optimizeImageForApi(file);
+      if (uploadRequestIdRef.current !== uploadRequestId) return;
+
+      setPreviewUrl((currentPreviewUrl) => {
+        if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+        return URL.createObjectURL(optimizedFile);
+      });
+      setUploadedFile(optimizedFile);
+      setValidationStatus("idle");
+      setValidationMessage(null);
+    } catch (error) {
+      if (uploadRequestIdRef.current !== uploadRequestId) return;
+
+      setUploadedFile(null);
+      setValidationStatus("invalid");
+      setValidationMessage(
+        error instanceof Error
+          ? error.message
+          : "사진을 분석하기 좋은 크기로 조정하지 못했어요. 다른 사진으로 다시 시도해 주세요.",
+      );
+    } finally {
+      if (uploadRequestIdRef.current === uploadRequestId) {
+        setIsPreparingPhoto(false);
+      }
+    }
   };
 
   const startAnalysis = async () => {
-    if (!uploadedFile || isAnalyzing || validationStatus !== "valid") return;
+    if (
+      !uploadedFile ||
+      isPreparingPhoto ||
+      isAnalyzing ||
+      validationStatus !== "valid"
+    ) {
+      return;
+    }
 
     setIsAnalyzing(true);
-    setIsOptimizing(true);
     setErrorMessage(null);
     setAnalysis(null);
     resetFollowUpState();
 
     try {
-      const optimizedFile = await optimizeImageForApi(uploadedFile);
-      setIsOptimizing(false);
-
       const formData = new FormData();
-      formData.append("image", optimizedFile);
+      formData.append("image", uploadedFile);
 
       const response = await fetch("/api/analyze-pet", {
         method: "POST",
@@ -714,7 +759,6 @@ export default function Home() {
           : GENERAL_ANALYSIS_ERROR_MESSAGE,
       );
     } finally {
-      setIsOptimizing(false);
       setIsAnalyzing(false);
     }
   };
@@ -734,6 +778,7 @@ export default function Home() {
 
     if (
       !uploadedFile ||
+      isPreparingPhoto ||
       hasAskedFollowUp ||
       isAskingFollowUp ||
       !followUpQuestion.trim()
@@ -753,9 +798,8 @@ export default function Home() {
     setFollowUpAnswer(null);
 
     try {
-      const optimizedFile = await optimizeImageForApi(uploadedFile);
       const formData = new FormData();
-      formData.append("image", optimizedFile);
+      formData.append("image", uploadedFile);
       formData.append("question", followUpQuestion.trim());
       const serializedAnalysis = JSON.stringify(analysis);
       formData.append("analysis", serializedAnalysis);
@@ -824,12 +868,6 @@ export default function Home() {
 
   useEffect(() => {
     if (!uploadedFile) return;
-
-    if (isFileTooLarge(uploadedFile)) {
-      setValidationStatus("invalid");
-      setValidationMessage(PHOTO_TOO_LARGE_MESSAGE);
-      return;
-    }
 
     const allowedTypes = new Set([
       "image/jpeg",
@@ -922,8 +960,7 @@ export default function Home() {
             구체적으로 분석할 수 있습니다.
           </p>
           <p className="mt-2 rounded-xl bg-teal-50 px-3 py-2 text-xs leading-relaxed text-teal-800">
-            최대 {PHOTO_UPLOAD_LIMIT_LABEL} 사진 업로드 가능하며, 업로드한 사진은
-            분석에만 사용되고 별도로 저장되지 않습니다.
+            업로드한 사진은 분석에만 사용되며 별도로 저장되지 않습니다.
           </p>
 
           <label className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-4 text-sm font-semibold text-stone-700 transition hover:border-teal-500 hover:bg-teal-50">
@@ -996,13 +1033,18 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setIsConfirmModalOpen(true)}
-            disabled={!uploadedFile || isAnalyzing || validationStatus !== "valid"}
+            disabled={
+              !uploadedFile ||
+              isPreparingPhoto ||
+              isAnalyzing ||
+              validationStatus !== "valid"
+            }
             className="w-full rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
-            {isAnalyzing
-              ? isOptimizing
-                ? "이미지 준비 중..."
-                : "행동 분석 중..."
+            {isPreparingPhoto
+              ? "사진 준비 중..."
+              : isAnalyzing
+                ? "행동 분석 중..."
               : "분석 시작하기"}
           </button>
           <p className="mt-3 text-xs leading-relaxed text-stone-500">
@@ -1018,12 +1060,12 @@ export default function Home() {
           <div className="mt-3">
             {!previewUrl ? (
               <EmptyResult text="먼저 반려동물 사진을 올려주세요." />
-            ) : isAnalyzing ? (
+            ) : isPreparingPhoto || isAnalyzing ? (
               <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-stone-300 border-t-teal-700" />
                 <p className="text-sm text-stone-600">
-                  {isOptimizing
-                    ? "사진 크기를 조정하고 있습니다..."
+                  {isPreparingPhoto
+                    ? "사진을 분석하기 좋은 크기로 조정하고 있어요..."
                     : "자세, 표정, 상황 단서를 살펴보고 있습니다..."}
                 </p>
               </div>
@@ -1057,7 +1099,7 @@ export default function Home() {
                   <textarea
                     value={followUpQuestion}
                     onChange={(event) => setFollowUpQuestion(event.target.value)}
-                    disabled={hasAskedFollowUp || isAskingFollowUp}
+                    disabled={isPreparingPhoto || hasAskedFollowUp || isAskingFollowUp}
                     rows={3}
                     placeholder={followUpPlaceholder}
                     className="mt-3 w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-100"
@@ -1066,6 +1108,7 @@ export default function Home() {
                     type="button"
                     onClick={askFollowUpQuestion}
                     disabled={
+                      isPreparingPhoto ||
                       hasAskedFollowUp ||
                       isAskingFollowUp ||
                       !followUpQuestion.trim()
@@ -1205,32 +1248,58 @@ function stripWrappingQuotes(text: string) {
 async function optimizeImageForApi(file: File): Promise<File> {
   const dataUrl = await readFileAsDataUrl(file);
   const image = await loadImage(dataUrl);
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "pet-photo";
+  let smallestBlob: Blob | null = null;
 
-  const maxDimension = 1536;
+  for (const step of IMAGE_COMPRESSION_STEPS) {
+    const canvas = drawImageToCanvas(image, step.maxDimension);
+    const optimizedBlob = await canvasToBlob(canvas, "image/jpeg", step.quality);
+
+    if (!smallestBlob || optimizedBlob.size < smallestBlob.size) {
+      smallestBlob = optimizedBlob;
+    }
+
+    if (optimizedBlob.size <= COMPRESSED_IMAGE_TARGET_BYTES) {
+      return new File([optimizedBlob], `${baseName}-optimized.jpg`, {
+        type: "image/jpeg",
+        lastModified: Date.now(),
+      });
+    }
+  }
+
+  if (smallestBlob && smallestBlob.size <= MAX_UPLOAD_SIZE_BYTES) {
+    return new File([smallestBlob], `${baseName}-optimized.jpg`, {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  }
+
+  throw new Error(
+    "사진을 분석하기 좋은 크기로 조정하지 못했어요. 다른 사진으로 다시 시도해 주세요.",
+  );
+}
+
+function drawImageToCanvas(
+  image: HTMLImageElement,
+  maxDimension: number,
+): HTMLCanvasElement {
   const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
   const width = Math.max(1, Math.round(image.width * scale));
   const height = Math.max(1, Math.round(image.height * scale));
-
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-
   const context = canvas.getContext("2d");
+
   if (!context) {
     throw new Error("이미지 처리를 위한 캔버스를 만들지 못했습니다.");
   }
 
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
   context.drawImage(image, 0, 0, width, height);
 
-  const outputType = file.type === "image/png" ? "image/webp" : "image/jpeg";
-  const optimizedBlob = await canvasToBlob(canvas, outputType, 0.84);
-  const extension = outputType === "image/webp" ? "webp" : "jpg";
-  const baseName = file.name.replace(/\.[^.]+$/, "");
-
-  return new File([optimizedBlob], `${baseName}-optimized.${extension}`, {
-    type: outputType,
-    lastModified: Date.now(),
-  });
+  return canvas;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {

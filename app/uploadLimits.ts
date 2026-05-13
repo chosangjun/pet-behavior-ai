@@ -7,5 +7,5 @@ export function isFileTooLarge(file: File) {
 }
 
 export function getPhotoTooLargeMessage() {
-  return "사진 용량이 커서 분석이 중단됐어요. 사진을 한 번 캡처하거나 작은 사진으로 다시 올려주세요.";
+  return "사진을 분석하기 좋은 크기로 조정하지 못했어요. 다른 사진으로 다시 시도해 주세요.";
 }
