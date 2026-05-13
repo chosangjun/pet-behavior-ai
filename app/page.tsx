@@ -1711,9 +1711,56 @@ function drawShareCardCanvas(
   const contentX = innerX + innerPadding;
   const contentY = innerY + innerPadding;
   const contentWidth = innerWidth - innerPadding * 2;
-  const imageHeight = Math.round(contentWidth * 1.16);
-  const textTop = contentY + imageHeight + 16;
-  const footerHeight = 42;
+  const contentBottom = innerY + innerHeight - innerPadding;
+  const textX = contentX + 4;
+  const textWidth = contentWidth - 8;
+  const imageToTextGap = 16;
+  const moodLineHeight = 14;
+  const moodToSummaryGap = 8;
+  const summaryLineHeight = 24;
+  const asideTopGap = 12;
+  const asideLineHeight = 18;
+  const footerTopGap = 16;
+  const footerDividerHeight = 1;
+  const footerPaddingTop = 12;
+  const footerContentHeight = 28;
+
+  context.textBaseline = "top";
+
+  context.font = "700 18px Arial, sans-serif";
+  const summaryLines = wrapCanvasText(
+    context,
+    getShareSummary(analysis),
+    textWidth,
+    3,
+  );
+
+  const aside = getShareAside(analysis);
+  context.font = "italic 12px Arial, sans-serif";
+  const asideLines = aside ? wrapCanvasText(context, aside, textWidth, 2) : [];
+
+  const summaryHeight = getCanvasTextBlockHeight(
+    summaryLines.length,
+    summaryLineHeight,
+  );
+  const asideHeight = getCanvasTextBlockHeight(asideLines.length, asideLineHeight);
+  const footerHeight = footerDividerHeight + footerPaddingTop + footerContentHeight;
+  const textAndFooterHeight =
+    moodLineHeight +
+    moodToSummaryGap +
+    summaryHeight +
+    (asideLines.length ? asideTopGap + asideHeight : 0) +
+    footerTopGap +
+    footerHeight;
+  const maxImageHeight = Math.round(contentWidth * 1.16);
+  const minImageHeight = Math.min(120, Math.round(contentWidth * 0.55));
+  const availableImageHeight =
+    contentBottom - contentY - imageToTextGap - textAndFooterHeight;
+  const imageHeight = Math.max(
+    minImageHeight,
+    Math.min(maxImageHeight, availableImageHeight),
+  );
+  let currentY = contentY + imageHeight + imageToTextGap;
 
   context.clearRect(0, 0, width, height);
   fillRoundRect(context, 0, 0, width, height, outerRadius, "#f8efe3");
@@ -1725,21 +1772,24 @@ function drawShareCardCanvas(
 
   context.fillStyle = "#0f766e";
   context.font = "600 12px Arial, sans-serif";
-  context.textBaseline = "top";
-  context.fillText(getShareMoodLabel(analysis), contentX + 4, textTop);
+  context.fillText(getShareMoodLabel(analysis), textX, currentY);
+  currentY += moodLineHeight + moodToSummaryGap;
 
   context.fillStyle = "#1c1917";
   context.font = "700 18px Arial, sans-serif";
-  drawWrappedText(context, getShareSummary(analysis), contentX + 4, textTop + 28, contentWidth - 8, 24, 3);
+  drawCanvasTextLines(context, summaryLines, textX, currentY, summaryLineHeight);
+  currentY += summaryHeight;
 
-  const aside = getShareAside(analysis);
-  if (aside) {
+  if (asideLines.length) {
+    currentY += asideTopGap;
     context.fillStyle = "#78716c";
     context.font = "italic 12px Arial, sans-serif";
-    drawWrappedText(context, aside, contentX + 4, textTop + 104, contentWidth - 8, 18, 2);
+    drawCanvasTextLines(context, asideLines, textX, currentY, asideLineHeight);
+    currentY += asideHeight;
   }
 
-  const footerY = height - padding - innerPadding - footerHeight;
+  currentY += footerTopGap;
+  const footerY = currentY;
   context.strokeStyle = "#e7e5e4";
   context.lineWidth = 1;
   context.beginPath();
@@ -1781,18 +1831,20 @@ function drawContainedImage(
   context.restore();
 }
 
-function drawWrappedText(
+function drawCanvasTextLines(
   context: CanvasRenderingContext2D,
-  text: string,
+  lines: string[],
   x: number,
   y: number,
-  maxWidth: number,
   lineHeight: number,
-  maxLines: number,
 ) {
-  wrapCanvasText(context, text, maxWidth, maxLines).forEach((line, index) => {
+  lines.forEach((line, index) => {
     context.fillText(line, x, y + index * lineHeight);
   });
+}
+
+function getCanvasTextBlockHeight(lineCount: number, lineHeight: number) {
+  return lineCount > 0 ? lineCount * lineHeight : 0;
 }
 
 function wrapCanvasText(
