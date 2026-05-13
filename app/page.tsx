@@ -774,7 +774,9 @@ export default function Home() {
   };
 
   const saveShareCard = async () => {
-    if (!shareCardRef.current || isSavingShareCard) return;
+    if (!shareCardRef.current || !analysis || !uploadedFile || isSavingShareCard) {
+      return;
+    }
 
     setIsSavingShareCard(true);
     setShareCardMessage(null);
@@ -784,7 +786,11 @@ export default function Home() {
 
     try {
       mobileFallbackWindow = isMobileBrowser ? window.open("", "_blank") : null;
-      const blob = await createShareCardImageBlob(shareCardRef.current);
+      const blob = await createShareCardImageBlob(
+        shareCardRef.current,
+        analysis,
+        uploadedFile,
+      );
       const fileName = getShareCardFileName();
 
       if (isMobileBrowser) {
@@ -1614,7 +1620,11 @@ function getReadableShareTextLength(text: string) {
 const SHARE_CARD_IMAGE_POSITION = "center top";
 const SHARE_CARD_EXPORT_SCALE = 3;
 
-async function createShareCardImageBlob(element: HTMLElement) {
+async function createShareCardImageBlob(
+  element: HTMLElement,
+  analysis?: BehaviorAnalysis,
+  imageFile?: File,
+) {
   await document.fonts?.ready;
 
   const rect = element.getBoundingClientRect();
@@ -1623,6 +1633,24 @@ async function createShareCardImageBlob(element: HTMLElement) {
 
   if (!width || !height) {
     throw new Error("공유용 카드를 만들 수 없습니다.");
+  }
+
+  if (analysis && imageFile) {
+    const imageDataUrl = await readFileAsDataUrl(imageFile);
+    const image = await loadImage(imageDataUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = width * SHARE_CARD_EXPORT_SCALE;
+    canvas.height = height * SHARE_CARD_EXPORT_SCALE;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("怨듭쑀??移대뱶瑜?留뚮뱾 ???놁뒿?덈떎.");
+    }
+
+    context.scale(SHARE_CARD_EXPORT_SCALE, SHARE_CARD_EXPORT_SCALE);
+    drawShareCardCanvas(context, width, height, image, analysis);
+
+    return canvasToBlob(canvas, "image/png", 1);
   }
 
   const clone = element.cloneNode(true) as HTMLElement;
@@ -1664,6 +1692,216 @@ async function createShareCardImageBlob(element: HTMLElement) {
   } finally {
     URL.revokeObjectURL(svgUrl);
   }
+}
+
+function drawShareCardCanvas(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  image: HTMLImageElement,
+  analysis: BehaviorAnalysis,
+) {
+  const outerRadius = 28;
+  const padding = 16;
+  const innerX = padding;
+  const innerY = padding;
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+  const innerPadding = 12;
+  const contentX = innerX + innerPadding;
+  const contentY = innerY + innerPadding;
+  const contentWidth = innerWidth - innerPadding * 2;
+  const imageHeight = Math.round(contentWidth * 1.16);
+  const textTop = contentY + imageHeight + 16;
+  const footerHeight = 42;
+
+  context.clearRect(0, 0, width, height);
+  fillRoundRect(context, 0, 0, width, height, outerRadius, "#f8efe3");
+  fillRoundRect(context, innerX, innerY, innerWidth, innerHeight, 22, "rgba(255,255,255,0.8)");
+  strokeRoundRect(context, innerX, innerY, innerWidth, innerHeight, 22, "rgba(255,255,255,0.95)", 1);
+
+  fillRoundRect(context, contentX, contentY, contentWidth, imageHeight, 18, "#f5f1e8");
+  drawContainedImage(context, image, contentX, contentY, contentWidth, imageHeight, 18);
+
+  context.fillStyle = "#0f766e";
+  context.font = "600 12px Arial, sans-serif";
+  context.textBaseline = "top";
+  context.fillText(getShareMoodLabel(analysis), contentX + 4, textTop);
+
+  context.fillStyle = "#1c1917";
+  context.font = "700 18px Arial, sans-serif";
+  drawWrappedText(context, getShareSummary(analysis), contentX + 4, textTop + 28, contentWidth - 8, 24, 3);
+
+  const aside = getShareAside(analysis);
+  if (aside) {
+    context.fillStyle = "#78716c";
+    context.font = "italic 12px Arial, sans-serif";
+    drawWrappedText(context, aside, contentX + 4, textTop + 104, contentWidth - 8, 18, 2);
+  }
+
+  const footerY = height - padding - innerPadding - footerHeight;
+  context.strokeStyle = "#e7e5e4";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(contentX, footerY);
+  context.lineTo(contentX + contentWidth, footerY);
+  context.stroke();
+
+  drawPawJellyCanvas(context, contentX, footerY + 14);
+  context.fillStyle = "#0f766e";
+  context.font = "700 14px Arial, sans-serif";
+  context.fillText("MomentPet", contentX + 36, footerY + 19);
+
+  context.fillStyle = "#a8a29e";
+  context.font = "500 11px Arial, sans-serif";
+  context.textAlign = "right";
+  context.fillText("pet mood note", contentX + contentWidth, footerY + 21);
+  context.textAlign = "left";
+}
+
+function drawContainedImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  const drawX = x + (width - drawWidth) / 2;
+  const drawY = y;
+
+  context.save();
+  createRoundRectPath(context, x, y, width, height, radius);
+  context.clip();
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+  context.restore();
+}
+
+function drawWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+) {
+  wrapCanvasText(context, text, maxWidth, maxLines).forEach((line, index) => {
+    context.fillText(line, x, y + index * lineHeight);
+  });
+}
+
+function wrapCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+) {
+  const characters = Array.from(text.replace(/\s+/g, " ").trim());
+  const lines: string[] = [];
+  let line = "";
+
+  for (const character of characters) {
+    const nextLine = `${line}${character}`;
+    if (line && context.measureText(nextLine).width > maxWidth) {
+      lines.push(line);
+      line = character;
+      if (lines.length === maxLines) break;
+      continue;
+    }
+    line = nextLine;
+  }
+
+  if (line && lines.length < maxLines) lines.push(line);
+
+  if (lines.length === maxLines) {
+    let lastLine = lines[maxLines - 1];
+    while (lastLine && context.measureText(`${lastLine}...`).width > maxWidth) {
+      lastLine = lastLine.slice(0, -1);
+    }
+    lines[maxLines - 1] = `${lastLine}...`;
+  }
+
+  return lines;
+}
+
+function drawPawJellyCanvas(context: CanvasRenderingContext2D, x: number, y: number) {
+  context.save();
+  context.fillStyle = "#ffe4e6";
+  context.beginPath();
+  context.arc(x + 14, y + 14, 14, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#fda4af";
+  context.beginPath();
+  context.ellipse(x + 14, y + 16.5, 5, 5.5, 0, 0, Math.PI * 2);
+  context.fill();
+
+  [
+    [x + 7, y + 10, 3],
+    [x + 13, y + 7, 3],
+    [x + 21, y + 10, 3],
+  ].forEach(([cx, cy, radius]) => {
+    context.beginPath();
+    context.arc(cx, cy, radius, 0, Math.PI * 2);
+    context.fill();
+  });
+  context.restore();
+}
+
+function fillRoundRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  fillStyle: string,
+) {
+  context.fillStyle = fillStyle;
+  createRoundRectPath(context, x, y, width, height, radius);
+  context.fill();
+}
+
+function strokeRoundRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  strokeStyle: string,
+  lineWidth: number,
+) {
+  context.strokeStyle = strokeStyle;
+  context.lineWidth = lineWidth;
+  createRoundRectPath(context, x, y, width, height, radius);
+  context.stroke();
+}
+
+function createRoundRectPath(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
 }
 
 function copyComputedStyles(source: Element, target: Element) {
