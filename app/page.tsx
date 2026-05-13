@@ -625,6 +625,7 @@ export default function Home() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isShareCardOpen, setIsShareCardOpen] = useState(false);
   const [isSavingShareCard, setIsSavingShareCard] = useState(false);
+  const [isMobileBrowser, setIsMobileBrowser] = useState(false);
   const [shareCardMessage, setShareCardMessage] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>("idle");
@@ -782,11 +783,11 @@ export default function Home() {
     setIsSavingShareCard(true);
     setShareCardMessage(null);
 
-    const isMobileBrowser = isLikelyMobileBrowser();
+    const shouldUseMobileShare = isMobileBrowser || isLikelyMobileBrowser();
     let mobileFallbackWindow: Window | null = null;
 
     try {
-      mobileFallbackWindow = isMobileBrowser ? window.open("", "_blank") : null;
+      mobileFallbackWindow = shouldUseMobileShare ? window.open("", "_blank") : null;
       const blob = await createShareCardImageBlob(
         shareCardRef.current,
         analysis,
@@ -794,9 +795,17 @@ export default function Home() {
       );
       const fileName = getShareCardFileName();
 
-      if (isMobileBrowser) {
+      if (shouldUseMobileShare) {
+        const file = createShareCardFile(blob, fileName);
+        const shared = await shareShareCardFile(file);
+
+        if (shared) {
+          mobileFallbackWindow?.close();
+          return;
+        }
+
         openBlobInNewTab(blob, fileName, mobileFallbackWindow);
-        setShareCardMessage("저장이 바로 되지 않으면 열린 이미지를 길게 눌러 저장해 주세요.");
+        setShareCardMessage("공유가 열리지 않으면 열린 이미지를 길게 눌러 저장해 주세요.");
         return;
       }
 
@@ -805,8 +814,8 @@ export default function Home() {
       mobileFallbackWindow?.close();
       console.error("Failed to save share card.", error);
       setShareCardMessage(
-        isMobileBrowser
-          ? "저장이 바로 되지 않으면 열린 이미지를 길게 눌러 저장해 주세요."
+        shouldUseMobileShare
+          ? "공유가 열리지 않으면 열린 이미지를 길게 눌러 저장해 주세요."
           : "저장 준비 중 문제가 생겼어요. 다시 시도해 주세요.",
       );
     } finally {
@@ -916,6 +925,14 @@ export default function Home() {
       setIsAskingFollowUp(false);
     }
   };
+
+  useEffect(() => {
+    const mobileBrowserCheckId = window.setTimeout(() => {
+      setIsMobileBrowser(isLikelyMobileBrowser());
+    }, 0);
+
+    return () => window.clearTimeout(mobileBrowserCheckId);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1277,7 +1294,11 @@ export default function Home() {
                 disabled={isSavingShareCard}
                 className="rounded-xl bg-teal-700 px-3 py-3 text-sm font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-stone-300"
               >
-                {isSavingShareCard ? "저장 중..." : "저장하기"}
+                {isSavingShareCard
+                  ? "저장 중..."
+                  : isMobileBrowser
+                    ? "공유/저장하기"
+                    : "이미지 다운로드"}
               </button>
               <button
                 type="button"
@@ -2024,6 +2045,30 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
 }
 
+function createShareCardFile(blob: Blob, fileName: string) {
+  return new File([blob], fileName, { type: "image/png" });
+}
+
+async function shareShareCardFile(file: File) {
+  const shareData: ShareData = {
+    files: [file],
+    title: "반려동물 행동 분석 카드",
+    text: "반려동물 행동 분석 결과를 공유해요.",
+  };
+
+  if (!navigator.canShare?.({ files: shareData.files }) || !navigator.share) {
+    return false;
+  }
+
+  try {
+    await navigator.share(shareData);
+    return true;
+  } catch (error) {
+    console.info("Share card sharing was cancelled or failed.", error);
+    return false;
+  }
+}
+
 function openBlobInNewTab(
   blob: Blob,
   fileName: string,
@@ -2031,19 +2076,95 @@ function openBlobInNewTab(
 ) {
   const imageUrl = URL.createObjectURL(blob);
   const openedWindow =
-    targetWindow ?? window.open(imageUrl, "_blank");
+    targetWindow ?? window.open("", "_blank");
 
   if (!openedWindow) {
     downloadBlob(blob, fileName);
     return;
   }
 
-  if (targetWindow) {
-    openedWindow.location.href = imageUrl;
-  }
+  openedWindow.document.open();
+  openedWindow.document.write(getImageFallbackHtml(imageUrl, fileName));
+  openedWindow.document.close();
 
   window.setTimeout(() => URL.revokeObjectURL(imageUrl), 60_000);
 }
+
+function getImageFallbackHtml(imageUrl: string, fileName: string) {
+  const escapedImageUrl = escapeHtmlAttribute(imageUrl);
+  const escapedFileName = escapeHtml(fileName);
+
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapedFileName}</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #fafaf9;
+      color: #292524;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      box-sizing: border-box;
+      display: grid;
+      min-height: 100vh;
+      gap: 16px;
+      align-content: start;
+      justify-items: center;
+      padding: 18px;
+    }
+    p {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: center;
+    }
+    img {
+      display: block;
+      width: min(100%, 720px);
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgb(41 37 36 / 14%);
+      -webkit-touch-callout: default;
+      user-select: auto;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p>이미지를 길게 눌러 저장하세요.</p>
+    <img src="${escapedImageUrl}" alt="반려동물 행동 분석 공유 카드">
+  </main>
+</body>
+</html>`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
+function escapeHtmlAttribute(value: string) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
 function isLikelyMobileBrowser() {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }

@@ -6,11 +6,7 @@
 - Local:         http://localhost:3000
 - Network:       http://192.168.45.60:3000
 - Environments: .env.local
-✓ Ready in 390ms
+✓ Ready in 376ms
 
- GET / 200 in 277ms (next.js: 153ms, application-code: 124ms)
- GET / 200 in 30ms (next.js: 3ms, application-code: 27ms)
- POST /api/validate-pet 200 in 4.3s (next.js: 82ms, application-code: 4.2s)
- POST /api/validate-pet 200 in 2.0s (next.js: 2ms, application-code: 2.0s)
- POST /api/analyze-pet 200 in 6.4s (next.js: 25ms, application-code: 6.4s)
-[?25h
+ GET / 200 in 272ms (next.js: 149ms, application-code: 123ms)
+ POST /api/validate-pet 200 in 1818ms (next.js: 85ms, application-code: 1734ms)
