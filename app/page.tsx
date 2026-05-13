@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, Ref, useEffect, useRef, useState } from "react";
 import {
   MAX_UPLOAD_SIZE_BYTES,
   getPhotoTooLargeMessage,
@@ -640,6 +640,7 @@ export default function Home() {
     getFollowUpPlaceholder(),
   );
   const uploadRequestIdRef = useRef(0);
+  const shareCardRef = useRef<HTMLElement | null>(null);
 
   const refreshFollowUpPlaceholder = (nextAnalysis?: BehaviorAnalysis | null) => {
     const nextPlaceholder = getFollowUpPlaceholder(
@@ -773,25 +774,64 @@ export default function Home() {
   };
 
   const saveShareCard = async () => {
-    if (!analysis || !previewUrl || isSavingShareCard) return;
+    if (!shareCardRef.current || isSavingShareCard) return;
+
+    setIsSavingShareCard(true);
+    setShareCardMessage(null);
+
+    let mobileFallbackWindow: Window | null = null;
+
+    try {
+      mobileFallbackWindow = isLikelyMobileBrowser()
+        ? window.open("", "_blank")
+        : null;
+      const blob = await createShareCardImageBlob(shareCardRef.current);
+      const fileName = getShareCardFileName();
+
+      if (isLikelyMobileBrowser()) {
+        if (await shareImageFile(blob, fileName)) {
+          mobileFallbackWindow?.close();
+          setShareCardMessage("공유 시트에서 이미지 저장 또는 공유를 선택해 주세요.");
+          return;
+        }
+
+        openBlobInNewTab(blob, mobileFallbackWindow);
+        setShareCardMessage("이미지를 새 탭으로 열었어요. 이미지를 길게 눌러 저장해 주세요.");
+        return;
+      }
+
+      downloadBlob(blob, fileName);
+      setShareCardMessage("공유용 카드 저장을 시작했어요.");
+    } catch (error) {
+      mobileFallbackWindow?.close();
+      console.error("Failed to save share card.", error);
+      setShareCardMessage(
+        "저장이 막힌 브라우저라면 공유하기를 누르거나 열린 이미지를 길게 눌러 저장해 주세요.",
+      );
+    } finally {
+      setIsSavingShareCard(false);
+    }
+  };
+
+  const shareShareCard = async () => {
+    if (!shareCardRef.current || isSavingShareCard) return;
 
     setIsSavingShareCard(true);
     setShareCardMessage(null);
 
     try {
-      const blob = await createShareCardImageBlob(previewUrl, analysis);
-      const downloadUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `momentpet-result-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(downloadUrl);
-      setShareCardMessage("공유용 카드가 저장되었어요.");
+      const blob = await createShareCardImageBlob(shareCardRef.current);
+      const didShare = await shareImageFile(blob, getShareCardFileName());
+
+      if (didShare) {
+        setShareCardMessage("공유 시트를 열었어요.");
+        return;
+      }
+
+      setShareCardMessage("이 브라우저에서는 이미지 공유를 지원하지 않아요. 저장 후 공유해 주세요.");
     } catch (error) {
-      console.error("Failed to save share card.", error);
-      setShareCardMessage("저장 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
+      console.error("Failed to share card.", error);
+      setShareCardMessage("공유 준비 중 문제가 생겼어요. 저장 후 공유해 주세요.");
     } finally {
       setIsSavingShareCard(false);
     }
@@ -1241,7 +1281,11 @@ export default function Home() {
               </button>
             </div>
 
-            <ShareResultCard analysis={analysis} imageUrl={previewUrl} />
+            <ShareResultCard
+              analysis={analysis}
+              captureRef={shareCardRef}
+              imageUrl={previewUrl}
+            />
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
@@ -1254,10 +1298,9 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  setShareCardMessage("공유 기능은 곧 연결될 예정이에요.")
-                }
-                className="rounded-xl bg-stone-100 px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-200"
+                onClick={shareShareCard}
+                disabled={isSavingShareCard}
+                className="rounded-xl bg-stone-100 px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-200 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
               >
                 공유하기
               </button>
@@ -1348,9 +1391,11 @@ function ResultCard({
 
 function ShareResultCard({
   analysis,
+  captureRef,
   imageUrl,
 }: {
   analysis: BehaviorAnalysis;
+  captureRef?: Ref<HTMLElement>;
   imageUrl: string;
 }) {
   const summary = getShareSummary(analysis);
@@ -1358,7 +1403,10 @@ function ShareResultCard({
   const aside = getShareAside(analysis);
 
   return (
-    <article className="mx-auto aspect-[4/5.4] w-full max-w-[320px] overflow-hidden rounded-[1.75rem] bg-[#f8efe3] p-4 shadow-[0_18px_40px_-28px_rgba(68,64,60,0.85)] ring-1 ring-stone-200">
+    <article
+      ref={captureRef}
+      className="mx-auto aspect-[4/5.4] w-full max-w-[320px] overflow-hidden rounded-[1.75rem] bg-[#f8efe3] p-4 shadow-[0_18px_40px_-28px_rgba(68,64,60,0.85)] ring-1 ring-stone-200"
+    >
       <div className="flex h-full flex-col rounded-[1.35rem] bg-white/80 p-3 ring-1 ring-white">
         <div className="relative aspect-[1/1.16] overflow-hidden rounded-[1.15rem] bg-[#f5f1e8]">
           <img
@@ -1588,295 +1636,159 @@ function getReadableShareTextLength(text: string) {
 }
 
 const SHARE_CARD_IMAGE_POSITION = "center top";
-const SHARE_CARD_CANVAS_WIDTH = 1080;
-const SHARE_CARD_CANVAS_HEIGHT = 1458;
+const SHARE_CARD_EXPORT_SCALE = 3;
 
-async function createShareCardImageBlob(
-  imageUrl: string,
-  analysis: BehaviorAnalysis,
-) {
-  const canvas = document.createElement("canvas");
-  canvas.width = SHARE_CARD_CANVAS_WIDTH;
-  canvas.height = SHARE_CARD_CANVAS_HEIGHT;
-  const context = canvas.getContext("2d");
+async function createShareCardImageBlob(element: HTMLElement) {
+  await document.fonts?.ready;
 
-  if (!context) {
+  const rect = element.getBoundingClientRect();
+  const width = Math.ceil(rect.width);
+  const height = Math.ceil(rect.height);
+
+  if (!width || !height) {
     throw new Error("공유용 카드를 만들 수 없습니다.");
   }
 
-  const image = await loadImage(imageUrl);
-  const summary = getShareSummary(analysis);
-  const moodLabel = getShareMoodLabel(analysis);
-  const aside = getShareAside(analysis);
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.maxWidth = "none";
+  clone.style.transform = "none";
+  clone.style.margin = "0";
 
-  const outerPadding = 54;
-  const innerPadding = 40;
-  const contentInset = 14;
-  const outerRadius = 95;
-  const innerRadius = 73;
-  const imageRadius = 62;
-  const innerX = outerPadding;
-  const innerY = outerPadding;
-  const innerWidth = canvas.width - outerPadding * 2;
-  const innerHeight = canvas.height - outerPadding * 2;
-  const imageX = innerX + innerPadding;
-  const imageY = innerY + innerPadding;
-  const imageWidth = innerWidth - innerPadding * 2;
-  const imageHeight = Math.round(imageWidth * 1.16);
-  const textX = imageX + contentInset;
-  const textWidth = imageWidth - contentInset * 2;
-  const labelY = imageY + imageHeight + 88;
-  const summaryY = labelY + 68;
-  const summaryLineHeight = 62;
-  const asideLineHeight = 40;
-  const footerY = innerY + innerHeight - 132;
-  const dividerY = footerY - 34;
+  copyComputedStyles(element, clone);
+  await inlineCloneImages(clone);
 
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  drawRoundedRect(context, 0, 0, canvas.width, canvas.height, outerRadius, "#f8efe3");
-
-  context.save();
-  createRoundedRectPath(context, 0, 0, canvas.width, canvas.height, outerRadius);
-  context.clip();
-
-  drawRoundedRect(context, innerX, innerY, innerWidth, innerHeight, innerRadius, "#fffdf8");
-  drawRoundedRect(context, imageX, imageY, imageWidth, imageHeight, imageRadius, "#f5f1e8");
-  drawPetContainedImage(context, image, imageX, imageY, imageWidth, imageHeight, imageRadius);
-
-  context.fillStyle = "#0f766e";
-  context.font = '700 38px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
-  context.textBaseline = "alphabetic";
-  context.fillText(moodLabel, textX, labelY);
-
-  context.fillStyle = "#1c1917";
-  context.font = '700 56px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
-  const summaryLines = getWrappedTextLines(context, summary, textWidth, 3);
-  drawTextLines(context, summaryLines, textX, summaryY, summaryLineHeight);
-
-  if (aside) {
-    const asideY = summaryY + summaryLineHeight * summaryLines.length + 48;
-    const maxAsideLines = Math.max(
-      1,
-      Math.floor((dividerY - asideY - 24) / asideLineHeight),
-    );
-
-    context.fillStyle = "#78716c";
-    context.font = 'italic 500 31px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
-    drawWrappedText(context, aside, textX, asideY, textWidth, asideLineHeight, maxAsideLines);
-  }
-
-  context.strokeStyle = "#e7e5e4";
-  context.lineWidth = 3;
-  context.beginPath();
-  context.moveTo(textX, dividerY);
-  context.lineTo(textX + textWidth, dividerY);
-  context.stroke();
-
-  drawPawJelly(context, textX, footerY - 22, 58);
-
-  context.fillStyle = "#0f766e";
-  context.font = '700 42px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
-  context.fillText("MomentPet", textX + 75, footerY + 18);
-
-  context.fillStyle = "#a8a29e";
-  context.font = '600 27px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
-  context.textAlign = "right";
-  context.fillText("pet mood note", textX + textWidth, footerY + 16);
-  context.textAlign = "left";
-  context.restore();
-
-  return canvasToBlob(canvas, "image/png", 1);
-}
-
-function drawPetContainedImage(
-  context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const containedImage = getContainedImagePlacement(image, width, height);
-
-  context.save();
-  createRoundedRectPath(context, x, y, width, height, radius);
-  context.clip();
-
-  context.drawImage(
-    image,
-    x + containedImage.x,
-    y + containedImage.y,
-    containedImage.width,
-    containedImage.height,
+  const serializedNode = new XMLSerializer().serializeToString(clone);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <foreignObject width="100%" height="100%">${serializedNode}</foreignObject>
+    </svg>
+  `;
+  const svgUrl = URL.createObjectURL(
+    new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
   );
-  context.restore();
+
+  try {
+    const image = await loadImage(svgUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = width * SHARE_CARD_EXPORT_SCALE;
+    canvas.height = height * SHARE_CARD_EXPORT_SCALE;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("공유용 카드를 만들 수 없습니다.");
+    }
+
+    context.scale(SHARE_CARD_EXPORT_SCALE, SHARE_CARD_EXPORT_SCALE);
+    context.drawImage(image, 0, 0, width, height);
+
+    return canvasToBlob(canvas, "image/png", 1);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
 }
 
-function getContainedImagePlacement(
-  image: HTMLImageElement,
-  targetWidth: number,
-  targetHeight: number,
-) {
-  const scale = Math.min(targetWidth / image.width, targetHeight / image.height);
-  const containedWidth = image.width * scale;
-  const containedHeight = image.height * scale;
+function copyComputedStyles(source: Element, target: Element) {
+  const computedStyle = window.getComputedStyle(source);
+  const inlineStyle = target.getAttribute("style") ?? "";
+  let computedStyleText = "";
 
-  return {
-    x: (targetWidth - containedWidth) / 2,
-    y: 0,
-    width: containedWidth,
-    height: containedHeight,
+  for (const property of computedStyle) {
+    computedStyleText += `${property}:${computedStyle.getPropertyValue(property)};`;
+  }
+
+  target.setAttribute("style", `${computedStyleText}${inlineStyle}`);
+
+  Array.from(source.children).forEach((sourceChild, index) => {
+    const targetChild = target.children.item(index);
+    if (targetChild) copyComputedStyles(sourceChild, targetChild);
+  });
+}
+
+async function inlineCloneImages(root: HTMLElement) {
+  const images = Array.from(root.querySelectorAll("img"));
+
+  await Promise.all(
+    images.map(async (image) => {
+      const src = image.getAttribute("src");
+      if (!src || src.startsWith("data:")) return;
+
+      const response = await fetch(src);
+      const blob = await response.blob();
+      image.setAttribute("src", await blobToDataUrl(blob));
+    }),
+  );
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("이미지를 읽지 못했습니다."));
+    };
+    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function getShareCardFileName() {
+  return `momentpet-result-${Date.now()}.png`;
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+}
+
+function openBlobInNewTab(blob: Blob, targetWindow?: Window | null) {
+  const imageUrl = URL.createObjectURL(blob);
+  const openedWindow =
+    targetWindow ?? window.open(imageUrl, "_blank");
+
+  if (!openedWindow) {
+    downloadBlob(blob, getShareCardFileName());
+    return;
+  }
+
+  if (targetWindow) {
+    openedWindow.location.href = imageUrl;
+  }
+
+  window.setTimeout(() => URL.revokeObjectURL(imageUrl), 60_000);
+}
+
+async function shareImageFile(blob: Blob, fileName: string) {
+  const file = new File([blob], fileName, { type: "image/png" });
+  const shareData: ShareData = {
+    files: [file],
+    text: "MomentPet 공유용 결과 카드",
+    title: "MomentPet",
   };
-}
 
-function drawRoundedRect(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-  fillStyle: string,
-) {
-  context.fillStyle = fillStyle;
-  createRoundedRectPath(context, x, y, width, height, radius);
-  context.fill();
-}
-
-function createRoundedRectPath(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const corner = Math.min(radius, width / 2, height / 2);
-
-  context.beginPath();
-  context.moveTo(x + corner, y);
-  context.lineTo(x + width - corner, y);
-  context.quadraticCurveTo(x + width, y, x + width, y + corner);
-  context.lineTo(x + width, y + height - corner);
-  context.quadraticCurveTo(x + width, y + height, x + width - corner, y + height);
-  context.lineTo(x + corner, y + height);
-  context.quadraticCurveTo(x, y + height, x, y + height - corner);
-  context.lineTo(x, y + corner);
-  context.quadraticCurveTo(x, y, x + corner, y);
-  context.closePath();
-}
-
-function drawWrappedText(
-  context: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines: number,
-) {
-  const lines = getWrappedTextLines(context, text, maxWidth, maxLines);
-  drawTextLines(context, lines, x, y, lineHeight);
-}
-
-function getWrappedTextLines(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  maxLines: number,
-) {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
-  let didOmitText = false;
-
-  for (const word of words) {
-    const nextLine = currentLine ? `${currentLine} ${word}` : word;
-    if (context.measureText(nextLine).width <= maxWidth) {
-      currentLine = nextLine;
-      continue;
-    }
-
-    if (currentLine) lines.push(currentLine);
-    currentLine = word;
-
-    if (lines.length === maxLines) {
-      didOmitText = true;
-      break;
-    }
+  if (!navigator.share || !navigator.canShare?.(shareData)) {
+    return false;
   }
 
-  if (currentLine && lines.length < maxLines) lines.push(currentLine);
-
-  return lines.slice(0, maxLines).map((line, index) => {
-    const isLastVisibleLine = index === maxLines - 1;
-    const visibleLine =
-      isLastVisibleLine && didOmitText ? `${line.trimEnd()}...` : line;
-
-    return fitTextToWidth(context, visibleLine, maxWidth);
-  });
+  await navigator.share(shareData);
+  return true;
 }
 
-function drawTextLines(
-  context: CanvasRenderingContext2D,
-  lines: string[],
-  x: number,
-  y: number,
-  lineHeight: number,
-) {
-  lines.forEach((line, index) => {
-    context.fillText(line, x, y + lineHeight * index);
-  });
-}
-
-function fitTextToWidth(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-) {
-  const compact = text.replace(/\s+/g, " ").trim();
-  if (context.measureText(compact).width <= maxWidth) return compact;
-
-  let end = compact.length;
-
-  while (end > 0) {
-    const candidate = compact.slice(0, end).trimEnd();
-    if (context.measureText(candidate).width <= maxWidth) return candidate;
-    end -= 1;
-  }
-
-  return compact;
-}
-
-function drawPawJelly(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-) {
-  context.fillStyle = "#ffe4e6";
-  context.beginPath();
-  context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = "#fda4af";
-  drawEllipse(context, x + 28, y + 34, 13, 15);
-  drawEllipse(context, x + 15, y + 23, 9, 10);
-  drawEllipse(context, x + 30, y + 15, 9, 10);
-  drawEllipse(context, x + 45, y + 23, 9, 10);
-}
-
-function drawEllipse(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radiusX: number,
-  radiusY: number,
-) {
-  context.beginPath();
-  context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
-  context.fill();
+function isLikelyMobileBrowser() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
 async function optimizeImageForApi(file: File): Promise<File> {
