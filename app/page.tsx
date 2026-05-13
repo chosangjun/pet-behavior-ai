@@ -15,6 +15,7 @@ type BehaviorAnalysis = {
   guardianResponse: string;
   caution: string;
   cuteThought: string;
+  summaryText: string;
 };
 
 type FollowUpMood = "active" | "tense" | "resting" | "curious" | "alert" | "neutral";
@@ -1472,6 +1473,9 @@ function getShareMoodLabel(analysis: BehaviorAnalysis) {
 }
 
 function getShareSummary(analysis: BehaviorAnalysis) {
+  const generatedSummary = analysis.summaryText?.trim();
+  if (generatedSummary) return generatedSummary;
+
   const text = getAnalysisText(analysis);
   const mood = getFollowUpMood(analysis);
   const atmosphere = getShareAtmosphere(text, mood);
