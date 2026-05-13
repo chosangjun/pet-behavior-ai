@@ -783,11 +783,11 @@ export default function Home() {
     setIsSavingShareCard(true);
     setShareCardMessage(null);
 
-    const shouldUseMobileShare = isMobileBrowser || isLikelyMobileBrowser();
+    const shouldOpenImageInNewTab = isMobileBrowser || isLikelyMobileBrowser();
     let mobileFallbackWindow: Window | null = null;
 
     try {
-      mobileFallbackWindow = shouldUseMobileShare ? window.open("", "_blank") : null;
+      mobileFallbackWindow = shouldOpenImageInNewTab ? window.open("", "_blank") : null;
       const blob = await createShareCardImageBlob(
         shareCardRef.current,
         analysis,
@@ -795,17 +795,9 @@ export default function Home() {
       );
       const fileName = getShareCardFileName();
 
-      if (shouldUseMobileShare) {
-        const file = createShareCardFile(blob, fileName);
-        const shared = await shareShareCardFile(file);
-
-        if (shared) {
-          mobileFallbackWindow?.close();
-          return;
-        }
-
+      if (shouldOpenImageInNewTab) {
         openBlobInNewTab(blob, fileName, mobileFallbackWindow);
-        setShareCardMessage("공유가 열리지 않으면 열린 이미지를 길게 눌러 저장해 주세요.");
+        setShareCardMessage("새 창에서 이미지를 길게 눌러 저장하세요.");
         return;
       }
 
@@ -814,8 +806,8 @@ export default function Home() {
       mobileFallbackWindow?.close();
       console.error("Failed to save share card.", error);
       setShareCardMessage(
-        shouldUseMobileShare
-          ? "공유가 열리지 않으면 열린 이미지를 길게 눌러 저장해 주세요."
+        shouldOpenImageInNewTab
+          ? "새 창에서 이미지를 길게 눌러 저장하세요."
           : "저장 준비 중 문제가 생겼어요. 다시 시도해 주세요.",
       );
     } finally {
@@ -1294,11 +1286,7 @@ export default function Home() {
                 disabled={isSavingShareCard}
                 className="rounded-xl bg-teal-700 px-3 py-3 text-sm font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-stone-300"
               >
-                {isSavingShareCard
-                  ? "저장 중..."
-                  : isMobileBrowser
-                    ? "공유/저장하기"
-                    : "이미지 다운로드"}
+                {isSavingShareCard ? "저장 중..." : "저장하기"}
               </button>
               <button
                 type="button"
@@ -2043,30 +2031,6 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.remove();
 
   window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-}
-
-function createShareCardFile(blob: Blob, fileName: string) {
-  return new File([blob], fileName, { type: "image/png" });
-}
-
-async function shareShareCardFile(file: File) {
-  const shareData: ShareData = {
-    files: [file],
-    title: "반려동물 행동 분석 카드",
-    text: "반려동물 행동 분석 결과를 공유해요.",
-  };
-
-  if (!navigator.canShare?.({ files: shareData.files }) || !navigator.share) {
-    return false;
-  }
-
-  try {
-    await navigator.share(shareData);
-    return true;
-  } catch (error) {
-    console.info("Share card sharing was cancelled or failed.", error);
-    return false;
-  }
 }
 
 function openBlobInNewTab(

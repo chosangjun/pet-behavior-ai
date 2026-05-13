@@ -10,3 +10,4 @@
 
  GET / 200 in 272ms (next.js: 149ms, application-code: 123ms)
  POST /api/validate-pet 200 in 1818ms (next.js: 85ms, application-code: 1734ms)
+ POST /api/analyze-pet 200 in 10.6s (next.js: 31ms, application-code: 10.5s)
