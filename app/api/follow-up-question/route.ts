@@ -14,7 +14,7 @@ const unrelatedAnswer =
   "사진이나 방금 분석한 행동과 이어지는 질문으로 물어봐 주시면 더 자연스럽게 이어서 볼 수 있어요.";
 
 const FOLLOW_UP_VALIDATION_MESSAGE =
-  "궁금한 점을 문장으로 입력해 주세요.";
+  "사진 속 반려동물과 관련된 질문을 입력해 주세요.";
 
 const MEANINGLESS_FOLLOW_UP_MESSAGE =
   FOLLOW_UP_VALIDATION_MESSAGE;

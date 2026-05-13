@@ -510,7 +510,7 @@ const GENERAL_ANALYSIS_ERROR_MESSAGE =
   "사진을 분석하는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.";
 
 const FOLLOW_UP_VALIDATION_MESSAGE =
-  "궁금한 점을 문장으로 입력해 주세요.";
+  "사진 속 반려동물과 관련된 질문을 입력해 주세요.";
 
 const MEANINGLESS_FOLLOW_UP_MESSAGE =
   FOLLOW_UP_VALIDATION_MESSAGE;
@@ -1095,6 +1095,10 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      <footer className="mx-auto mt-6 w-full max-w-md pb-1 text-center text-[11px] text-stone-400">
+        Created by Sangjun
+      </footer>
 
       {modalImageUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/85 p-4">
