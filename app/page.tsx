@@ -779,34 +779,28 @@ export default function Home() {
     setIsSavingShareCard(true);
     setShareCardMessage(null);
 
+    const isMobileBrowser = isLikelyMobileBrowser();
     let mobileFallbackWindow: Window | null = null;
 
     try {
-      mobileFallbackWindow = isLikelyMobileBrowser()
-        ? window.open("", "_blank")
-        : null;
+      mobileFallbackWindow = isMobileBrowser ? window.open("", "_blank") : null;
       const blob = await createShareCardImageBlob(shareCardRef.current);
       const fileName = getShareCardFileName();
 
-      if (isLikelyMobileBrowser()) {
-        if (await shareImageFile(blob, fileName)) {
-          mobileFallbackWindow?.close();
-          setShareCardMessage("공유 시트에서 이미지 저장 또는 공유를 선택해 주세요.");
-          return;
-        }
-
-        openBlobInNewTab(blob, mobileFallbackWindow);
-        setShareCardMessage("이미지를 새 탭으로 열었어요. 이미지를 길게 눌러 저장해 주세요.");
+      if (isMobileBrowser) {
+        openBlobInNewTab(blob, fileName, mobileFallbackWindow);
+        setShareCardMessage("저장이 바로 되지 않으면 열린 이미지를 길게 눌러 저장해 주세요.");
         return;
       }
 
       downloadBlob(blob, fileName);
-      setShareCardMessage("공유용 카드 저장을 시작했어요.");
     } catch (error) {
       mobileFallbackWindow?.close();
       console.error("Failed to save share card.", error);
       setShareCardMessage(
-        "저장이 막힌 브라우저라면 공유하기를 누르거나 열린 이미지를 길게 눌러 저장해 주세요.",
+        isMobileBrowser
+          ? "저장이 바로 되지 않으면 열린 이미지를 길게 눌러 저장해 주세요."
+          : "저장 준비 중 문제가 생겼어요. 다시 시도해 주세요.",
       );
     } finally {
       setIsSavingShareCard(false);
@@ -816,25 +810,7 @@ export default function Home() {
   const shareShareCard = async () => {
     if (!shareCardRef.current || isSavingShareCard) return;
 
-    setIsSavingShareCard(true);
-    setShareCardMessage(null);
-
-    try {
-      const blob = await createShareCardImageBlob(shareCardRef.current);
-      const didShare = await shareImageFile(blob, getShareCardFileName());
-
-      if (didShare) {
-        setShareCardMessage("공유 시트를 열었어요.");
-        return;
-      }
-
-      setShareCardMessage("이 브라우저에서는 이미지 공유를 지원하지 않아요. 저장 후 공유해 주세요.");
-    } catch (error) {
-      console.error("Failed to share card.", error);
-      setShareCardMessage("공유 준비 중 문제가 생겼어요. 저장 후 공유해 주세요.");
-    } finally {
-      setIsSavingShareCard(false);
-    }
+    setShareCardMessage("공유 기능은 곧 추가될 예정이에요.");
   };
 
   const askFollowUpQuestion = async () => {
@@ -1754,13 +1730,17 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
 }
 
-function openBlobInNewTab(blob: Blob, targetWindow?: Window | null) {
+function openBlobInNewTab(
+  blob: Blob,
+  fileName: string,
+  targetWindow?: Window | null,
+) {
   const imageUrl = URL.createObjectURL(blob);
   const openedWindow =
     targetWindow ?? window.open(imageUrl, "_blank");
 
   if (!openedWindow) {
-    downloadBlob(blob, getShareCardFileName());
+    downloadBlob(blob, fileName);
     return;
   }
 
@@ -1770,23 +1750,6 @@ function openBlobInNewTab(blob: Blob, targetWindow?: Window | null) {
 
   window.setTimeout(() => URL.revokeObjectURL(imageUrl), 60_000);
 }
-
-async function shareImageFile(blob: Blob, fileName: string) {
-  const file = new File([blob], fileName, { type: "image/png" });
-  const shareData: ShareData = {
-    files: [file],
-    text: "MomentPet 공유용 결과 카드",
-    title: "MomentPet",
-  };
-
-  if (!navigator.share || !navigator.canShare?.(shareData)) {
-    return false;
-  }
-
-  await navigator.share(shareData);
-  return true;
-}
-
 function isLikelyMobileBrowser() {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
