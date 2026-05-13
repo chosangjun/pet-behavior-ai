@@ -622,6 +622,9 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isShareCardOpen, setIsShareCardOpen] = useState(false);
+  const [isSavingShareCard, setIsSavingShareCard] = useState(false);
+  const [shareCardMessage, setShareCardMessage] = useState<string | null>(null);
   const [validationStatus, setValidationStatus] =
     useState<ValidationStatus>("idle");
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
@@ -665,6 +668,8 @@ export default function Home() {
     setUploadedFile(null);
     setAnalysis(null);
     setErrorMessage(null);
+    setIsShareCardOpen(false);
+    setShareCardMessage(null);
     setIsPreparingPhoto(false);
     setValidationStatus("idle");
     setValidationMessage(null);
@@ -684,6 +689,8 @@ export default function Home() {
     setUploadedFile(null);
     setAnalysis(null);
     setErrorMessage(null);
+    setIsShareCardOpen(false);
+    setShareCardMessage(null);
     setIsPreparingPhoto(true);
     setValidationStatus("checking");
     setValidationMessage("사진을 분석하기 좋은 크기로 조정하고 있어요...");
@@ -730,6 +737,8 @@ export default function Home() {
     setIsAnalyzing(true);
     setErrorMessage(null);
     setAnalysis(null);
+    setIsShareCardOpen(false);
+    setShareCardMessage(null);
     resetFollowUpState();
 
     try {
@@ -760,6 +769,31 @@ export default function Home() {
       );
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const saveShareCard = async () => {
+    if (!analysis || !previewUrl || isSavingShareCard) return;
+
+    setIsSavingShareCard(true);
+    setShareCardMessage(null);
+
+    try {
+      const blob = await createShareCardImageBlob(previewUrl, analysis);
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `momentpet-result-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+      setShareCardMessage("공유용 카드가 저장되었어요.");
+    } catch (error) {
+      console.error("Failed to save share card.", error);
+      setShareCardMessage("저장 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsSavingShareCard(false);
     }
   };
 
@@ -1089,6 +1123,25 @@ export default function Home() {
                   ) : null}
                 </div>
 
+                <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
+                  <p className="text-sm font-semibold text-teal-900">
+                    오늘의 순간을 카드로 남겨보세요.
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-teal-800/80">
+                    긴 분석 대신 사진과 핵심 분위기만 담은 공유용 요약 카드로 만들어드려요.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShareCardMessage(null);
+                      setIsShareCardOpen(true);
+                    }}
+                    className="mt-3 w-full rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-600 active:scale-[0.98]"
+                  >
+                    공유용 카드 만들기
+                  </button>
+                </div>
+
                 <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
                   <h3 className="text-sm font-semibold text-stone-900">
                     추가 질문 1회
@@ -1167,6 +1220,58 @@ export default function Home() {
         </div>
       ) : null}
 
+      {isShareCardOpen && analysis && previewUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/60 p-4">
+          <div className="my-auto w-full max-w-sm rounded-2xl bg-white p-4 shadow-[0_24px_54px_-28px_rgba(28,25,23,0.9)] ring-1 ring-stone-200">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-stone-950">
+                  공유용 결과 카드
+                </h3>
+                <p className="mt-1 text-xs text-stone-500">
+                  사진과 분석 분위기를 짧게 담았어요.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShareCardOpen(false)}
+                className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
+              >
+                닫기
+              </button>
+            </div>
+
+            <ShareResultCard analysis={analysis} imageUrl={previewUrl} />
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={saveShareCard}
+                disabled={isSavingShareCard}
+                className="rounded-xl bg-teal-700 px-3 py-3 text-sm font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-stone-300"
+              >
+                {isSavingShareCard ? "저장 중..." : "저장하기"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setShareCardMessage("공유 기능은 곧 연결될 예정이에요.")
+                }
+                className="rounded-xl bg-stone-100 px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-200"
+              >
+                공유하기
+              </button>
+            </div>
+
+            {shareCardMessage ? (
+              <p className="mt-3 text-center text-xs leading-relaxed text-stone-500">
+                {shareCardMessage}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {isConfirmModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-[0_20px_40px_-24px_rgba(28,25,23,0.8)] ring-1 ring-stone-200">
@@ -1241,8 +1346,464 @@ function ResultCard({
   );
 }
 
+function ShareResultCard({
+  analysis,
+  imageUrl,
+}: {
+  analysis: BehaviorAnalysis;
+  imageUrl: string;
+}) {
+  const summary = getShareSummary(analysis);
+  const moodLabel = getShareMoodLabel(analysis);
+  const aside = getShareAside(analysis);
+
+  return (
+    <article className="mx-auto aspect-[4/5.4] w-full max-w-[320px] overflow-hidden rounded-[1.75rem] bg-[#f8efe3] p-4 shadow-[0_18px_40px_-28px_rgba(68,64,60,0.85)] ring-1 ring-stone-200">
+      <div className="flex h-full flex-col rounded-[1.35rem] bg-white/80 p-3 ring-1 ring-white">
+        <div className="relative aspect-[1/1.16] overflow-hidden rounded-[1.15rem] bg-[#f5f1e8]">
+          <img
+            src={imageUrl}
+            alt="공유용 결과 카드 반려동물 사진"
+            className="h-full w-full object-contain"
+            style={{ objectPosition: SHARE_CARD_IMAGE_POSITION }}
+          />
+        </div>
+        <div className="flex flex-1 flex-col justify-between px-1 pb-1 pt-4">
+          <div>
+            <p className="text-xs font-semibold text-teal-700">{moodLabel}</p>
+            <p className="mt-2 text-[1.12rem] font-bold leading-snug text-stone-900">
+              {summary}
+            </p>
+            {aside ? (
+              <p className="mt-3 text-xs italic leading-relaxed text-stone-500">
+                {aside}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-stone-200 pt-3">
+            <div className="flex items-center gap-2">
+              <PawJellyIcon />
+              <span className="text-sm font-bold text-teal-700">MomentPet</span>
+            </div>
+            <span className="text-[11px] font-medium text-stone-400">
+              pet mood note
+            </span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function PawJellyIcon() {
+  return (
+    <span
+      aria-hidden="true"
+      className="relative block h-7 w-7 rounded-full bg-rose-100"
+    >
+      <span className="absolute left-[9px] top-[11px] h-[11px] w-[10px] rounded-full bg-rose-300" />
+      <span className="absolute left-[4px] top-[7px] h-[6px] w-[6px] rounded-full bg-rose-300" />
+      <span className="absolute left-[10px] top-[4px] h-[6px] w-[6px] rounded-full bg-rose-300" />
+      <span className="absolute right-[4px] top-[7px] h-[6px] w-[6px] rounded-full bg-rose-300" />
+    </span>
+  );
+}
+
 function stripWrappingQuotes(text: string) {
   return text.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, "");
+}
+
+function getShareMoodLabel(analysis: BehaviorAnalysis) {
+  const mood = getFollowUpMood(analysis);
+  const labels: Record<FollowUpMood, string> = {
+    active: "생기 있는 순간",
+    tense: "조심스러운 순간",
+    resting: "편안한 쉼",
+    curious: "호기심 어린 순간",
+    alert: "신중한 관찰",
+    neutral: "오늘의 반려동물 마음",
+  };
+
+  return labels[mood];
+}
+
+function getShareSummary(analysis: BehaviorAnalysis) {
+  const text = getAnalysisText(analysis);
+  const mood = getFollowUpMood(analysis);
+  const atmosphere = getShareAtmosphere(text, mood);
+  const action = getShareAction(text, mood);
+  const emotion = getShareEmotion(text, mood);
+  const templateIndex = getStableTextIndex(text, 6);
+
+  const templates = [
+    `${atmosphere} 속에서 ${action} ${emotion}을 담고 있어요.`,
+    `${action} ${emotion}이 차분히 전해지는 장면이에요.`,
+    `${action} ${emotion} 쪽으로 마음이 머무는 순간이에요.`,
+    `${atmosphere}와 ${emotion}이 자연스럽게 이어져요.`,
+    `${action} 지금의 분위기를 천천히 받아들이고 있어요.`,
+    `${emotion}을 품고 ${action} 오늘의 순간을 지나고 있어요.`,
+  ];
+
+  return templates[templateIndex];
+}
+
+function getShareAside(analysis: BehaviorAnalysis) {
+  const thought = stripWrappingQuotes(analysis.cuteThought);
+  if (!thought) return "";
+  if (getReadableShareTextLength(thought) <= 28) return `“${thought}”`;
+
+  const mood = getFollowUpMood(analysis);
+  const fallbacks: Record<FollowUpMood, string> = {
+    active: "“조금 더 함께하고 싶은 순간이야.”",
+    tense: "“천천히 다가와 주면 좋겠어.”",
+    resting: "“이 자리에서 조금 더 쉬고 싶어.”",
+    curious: "“조금만 더 살펴보고 싶어.”",
+    alert: "“잠시만 더 지켜보고 싶어.”",
+    neutral: "“지금 이 분위기를 천천히 느끼고 있어.”",
+  };
+
+  return fallbacks[mood];
+}
+
+function getShareAtmosphere(text: string, mood: FollowUpMood) {
+  if (includesAny(text, ["낯설", "조심", "불안", "긴장", "스트레스"])) {
+    return "조심스럽고 차분한 공기";
+  }
+
+  if (includesAny(text, ["호기심", "궁금", "탐색", "살피", "관심", "확인"])) {
+    return "주변을 살피는 호기심 어린 공기";
+  }
+
+  if (includesAny(text, ["놀이", "장난", "신나", "활발", "에너지", "즐거"])) {
+    return "가볍고 생기 있는 공기";
+  }
+
+  if (includesAny(text, ["휴식", "쉬", "졸", "잠", "편안", "차분", "느긋", "안정"])) {
+    return "편안하고 느긋한 공기";
+  }
+
+  const fallbacks: Record<FollowUpMood, string> = {
+    active: "가볍고 생기 있는 공기",
+    tense: "조심스럽고 차분한 공기",
+    resting: "편안하고 느긋한 공기",
+    curious: "주변을 살피는 호기심 어린 공기",
+    alert: "조금 예민하고 신중한 공기",
+    neutral: "잔잔한 일상의 공기",
+  };
+
+  return fallbacks[mood];
+}
+
+function getShareAction(text: string, mood: FollowUpMood) {
+  if (includesAny(text, ["바라", "쳐다", "주시", "시선", "살피", "확인"])) {
+    return "주변을 차분히 바라보며";
+  }
+
+  if (includesAny(text, ["쉬", "휴식", "누워", "앉아", "졸", "잠", "느긋"])) {
+    return "편안한 자리에서 쉬며";
+  }
+
+  if (includesAny(text, ["보호자", "옆", "함께", "관심", "기대", "반응"])) {
+    return "보호자 곁의 반응을 느끼며";
+  }
+
+  if (includesAny(text, ["놀이", "장난", "움직", "활발", "에너지", "꼬리"])) {
+    return "몸짓으로 기분을 표현하며";
+  }
+
+  if (includesAny(text, ["냄새", "탐색", "궁금", "호기심", "새로운"])) {
+    return "새로운 단서를 천천히 살피며";
+  }
+
+  const fallbacks: Record<FollowUpMood, string> = {
+    active: "몸짓으로 기분을 표현하며",
+    tense: "상황을 조심스럽게 살피며",
+    resting: "편안한 자리에서 쉬며",
+    curious: "새로운 단서를 천천히 살피며",
+    alert: "주변 변화를 신중하게 살피며",
+    neutral: "자연스러운 표정과 자세로",
+  };
+
+  return fallbacks[mood];
+}
+
+function getShareEmotion(text: string, mood: FollowUpMood) {
+  if (includesAny(text, ["편안", "안정", "차분", "느긋", "여유"])) {
+    return "안정감";
+  }
+
+  if (includesAny(text, ["궁금", "호기심", "관심", "탐색"])) {
+    return "궁금함";
+  }
+
+  if (includesAny(text, ["즐거", "신나", "놀이", "활발", "에너지"])) {
+    return "즐거움";
+  }
+
+  if (includesAny(text, ["불안", "긴장", "조심", "낯설", "주저"])) {
+    return "조심스러운 마음";
+  }
+
+  const fallbacks: Record<FollowUpMood, string> = {
+    active: "즐거움",
+    tense: "조심스러운 마음",
+    resting: "안정감",
+    curious: "궁금함",
+    alert: "신중한 마음",
+    neutral: "잔잔한 감정",
+  };
+
+  return fallbacks[mood];
+}
+
+function includesAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function getStableTextIndex(text: string, modulo: number) {
+  const hash = Array.from(text).reduce(
+    (value, character) => (value * 31 + character.charCodeAt(0)) >>> 0,
+    0,
+  );
+
+  return hash % modulo;
+}
+
+function getReadableShareTextLength(text: string) {
+  return text.replace(/\s/g, "").length;
+}
+
+const SHARE_CARD_IMAGE_POSITION = "center top";
+
+async function createShareCardImageBlob(
+  imageUrl: string,
+  analysis: BehaviorAnalysis,
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1350;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("공유용 카드를 만들 수 없습니다.");
+  }
+
+  const image = await loadImage(imageUrl);
+  const summary = getShareSummary(analysis);
+  const moodLabel = getShareMoodLabel(analysis);
+  const aside = getShareAside(analysis);
+
+  context.fillStyle = "#f8efe3";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawRoundedRect(context, 70, 70, 940, 1210, 58, "#fffdf8");
+  drawRoundedRect(context, 105, 105, 870, 820, 44, "#f5f1e8");
+  drawPetContainedImage(context, image, 105, 105, 870, 820, 44);
+
+  context.fillStyle = "#0f766e";
+  context.font = '700 38px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  context.fillText(moodLabel, 120, 970);
+
+  context.fillStyle = "#1c1917";
+  context.font = '700 58px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  drawWrappedText(context, summary, 120, 1040, 820, 66, 3);
+
+  if (aside) {
+    context.fillStyle = "#78716c";
+    context.font = 'italic 500 31px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+    drawWrappedText(context, aside, 120, 1162, 820, 40, 1);
+  }
+
+  context.strokeStyle = "#e7e5e4";
+  context.lineWidth = 3;
+  context.beginPath();
+  context.moveTo(120, 1200);
+  context.lineTo(960, 1200);
+  context.stroke();
+
+  drawPawJelly(context, 120, 1220, 58);
+
+  context.fillStyle = "#0f766e";
+  context.font = '700 42px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  context.fillText("MomentPet", 195, 1260);
+
+  context.fillStyle = "#a8a29e";
+  context.font = '600 27px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  context.textAlign = "right";
+  context.fillText("pet mood note", 960, 1258);
+  context.textAlign = "left";
+
+  return canvasToBlob(canvas, "image/png", 1);
+}
+
+function drawPetContainedImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const containedImage = getContainedImagePlacement(image, width, height);
+
+  context.save();
+  createRoundedRectPath(context, x, y, width, height, radius);
+  context.clip();
+
+  context.drawImage(
+    image,
+    x + containedImage.x,
+    y + containedImage.y,
+    containedImage.width,
+    containedImage.height,
+  );
+  context.restore();
+}
+
+function getContainedImagePlacement(
+  image: HTMLImageElement,
+  targetWidth: number,
+  targetHeight: number,
+) {
+  const scale = Math.min(targetWidth / image.width, targetHeight / image.height);
+  const containedWidth = image.width * scale;
+  const containedHeight = image.height * scale;
+
+  return {
+    x: (targetWidth - containedWidth) / 2,
+    y: 0,
+    width: containedWidth,
+    height: containedHeight,
+  };
+}
+
+function drawRoundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  fillStyle: string,
+) {
+  context.fillStyle = fillStyle;
+  createRoundedRectPath(context, x, y, width, height, radius);
+  context.fill();
+}
+
+function createRoundedRectPath(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const corner = Math.min(radius, width / 2, height / 2);
+
+  context.beginPath();
+  context.moveTo(x + corner, y);
+  context.lineTo(x + width - corner, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + corner);
+  context.lineTo(x + width, y + height - corner);
+  context.quadraticCurveTo(x + width, y + height, x + width - corner, y + height);
+  context.lineTo(x + corner, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - corner);
+  context.lineTo(x, y + corner);
+  context.quadraticCurveTo(x, y, x + corner, y);
+  context.closePath();
+}
+
+function drawWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+) {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+  let didOmitText = false;
+
+  for (const word of words) {
+    const nextLine = currentLine ? `${currentLine} ${word}` : word;
+    if (context.measureText(nextLine).width <= maxWidth) {
+      currentLine = nextLine;
+      continue;
+    }
+
+    if (currentLine) lines.push(currentLine);
+    currentLine = word;
+
+    if (lines.length === maxLines) {
+      didOmitText = true;
+      break;
+    }
+  }
+
+  if (currentLine && lines.length < maxLines) lines.push(currentLine);
+
+  lines.slice(0, maxLines).forEach((line, index) => {
+    const isLastVisibleLine = index === maxLines - 1;
+    const visibleLine =
+      isLastVisibleLine && didOmitText
+        ? fitTextToWidth(context, line, maxWidth)
+        : line;
+    context.fillText(visibleLine, x, y + lineHeight * index);
+  });
+}
+
+function fitTextToWidth(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+) {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (context.measureText(compact).width <= maxWidth) return compact;
+
+  let end = compact.length;
+
+  while (end > 0) {
+    const candidate = compact.slice(0, end).trimEnd();
+    if (context.measureText(candidate).width <= maxWidth) return candidate;
+    end -= 1;
+  }
+
+  return compact;
+}
+
+function drawPawJelly(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+) {
+  context.fillStyle = "#ffe4e6";
+  context.beginPath();
+  context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#fda4af";
+  drawEllipse(context, x + 28, y + 34, 13, 15);
+  drawEllipse(context, x + 15, y + 23, 9, 10);
+  drawEllipse(context, x + 30, y + 15, 9, 10);
+  drawEllipse(context, x + 45, y + 23, 9, 10);
+}
+
+function drawEllipse(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radiusX: number,
+  radiusY: number,
+) {
+  context.beginPath();
+  context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+  context.fill();
 }
 
 async function optimizeImageForApi(file: File): Promise<File> {

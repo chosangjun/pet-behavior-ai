@@ -1,0 +1,13 @@
+
+> pet-behavior-ai@0.1.0 dev
+> next dev -p 3001
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.45.60:3001
+- Environments: .env.local
+✓ Ready in 339ms
+
+ GET / 200 in 269ms (next.js: 144ms, application-code: 126ms)
+ GET / 200 in 34ms (next.js: 3ms, application-code: 31ms)
+[?25h
