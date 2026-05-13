@@ -1371,11 +1371,25 @@ function ShareResultCard({
         <div className="flex flex-1 flex-col justify-between px-1 pb-1 pt-4">
           <div>
             <p className="text-xs font-semibold text-teal-700">{moodLabel}</p>
-            <p className="mt-2 text-[1.12rem] font-bold leading-snug text-stone-900">
+            <p
+              className="mt-2 overflow-hidden text-[1.12rem] font-bold leading-snug text-stone-900"
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
               {summary}
             </p>
             {aside ? (
-              <p className="mt-3 text-xs italic leading-relaxed text-stone-500">
+              <p
+                className="mt-3 overflow-hidden text-xs italic leading-relaxed text-stone-500"
+                style={{
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                }}
+              >
                 {aside}
               </p>
             ) : null}
@@ -1574,14 +1588,16 @@ function getReadableShareTextLength(text: string) {
 }
 
 const SHARE_CARD_IMAGE_POSITION = "center top";
+const SHARE_CARD_CANVAS_WIDTH = 1080;
+const SHARE_CARD_CANVAS_HEIGHT = 1458;
 
 async function createShareCardImageBlob(
   imageUrl: string,
   analysis: BehaviorAnalysis,
 ) {
   const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = 1350;
+  canvas.width = SHARE_CARD_CANVAS_WIDTH;
+  canvas.height = SHARE_CARD_CANVAS_HEIGHT;
   const context = canvas.getContext("2d");
 
   if (!context) {
@@ -1593,45 +1609,81 @@ async function createShareCardImageBlob(
   const moodLabel = getShareMoodLabel(analysis);
   const aside = getShareAside(analysis);
 
-  context.fillStyle = "#f8efe3";
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  const outerPadding = 54;
+  const innerPadding = 40;
+  const contentInset = 14;
+  const outerRadius = 95;
+  const innerRadius = 73;
+  const imageRadius = 62;
+  const innerX = outerPadding;
+  const innerY = outerPadding;
+  const innerWidth = canvas.width - outerPadding * 2;
+  const innerHeight = canvas.height - outerPadding * 2;
+  const imageX = innerX + innerPadding;
+  const imageY = innerY + innerPadding;
+  const imageWidth = innerWidth - innerPadding * 2;
+  const imageHeight = Math.round(imageWidth * 1.16);
+  const textX = imageX + contentInset;
+  const textWidth = imageWidth - contentInset * 2;
+  const labelY = imageY + imageHeight + 88;
+  const summaryY = labelY + 68;
+  const summaryLineHeight = 62;
+  const asideLineHeight = 40;
+  const footerY = innerY + innerHeight - 132;
+  const dividerY = footerY - 34;
 
-  drawRoundedRect(context, 70, 70, 940, 1210, 58, "#fffdf8");
-  drawRoundedRect(context, 105, 105, 870, 820, 44, "#f5f1e8");
-  drawPetContainedImage(context, image, 105, 105, 870, 820, 44);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  drawRoundedRect(context, 0, 0, canvas.width, canvas.height, outerRadius, "#f8efe3");
+
+  context.save();
+  createRoundedRectPath(context, 0, 0, canvas.width, canvas.height, outerRadius);
+  context.clip();
+
+  drawRoundedRect(context, innerX, innerY, innerWidth, innerHeight, innerRadius, "#fffdf8");
+  drawRoundedRect(context, imageX, imageY, imageWidth, imageHeight, imageRadius, "#f5f1e8");
+  drawPetContainedImage(context, image, imageX, imageY, imageWidth, imageHeight, imageRadius);
 
   context.fillStyle = "#0f766e";
-  context.font = '700 38px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  context.fillText(moodLabel, 120, 970);
+  context.font = '700 38px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
+  context.textBaseline = "alphabetic";
+  context.fillText(moodLabel, textX, labelY);
 
   context.fillStyle = "#1c1917";
-  context.font = '700 58px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  drawWrappedText(context, summary, 120, 1040, 820, 66, 3);
+  context.font = '700 56px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
+  const summaryLines = getWrappedTextLines(context, summary, textWidth, 3);
+  drawTextLines(context, summaryLines, textX, summaryY, summaryLineHeight);
 
   if (aside) {
+    const asideY = summaryY + summaryLineHeight * summaryLines.length + 48;
+    const maxAsideLines = Math.max(
+      1,
+      Math.floor((dividerY - asideY - 24) / asideLineHeight),
+    );
+
     context.fillStyle = "#78716c";
-    context.font = 'italic 500 31px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-    drawWrappedText(context, aside, 120, 1162, 820, 40, 1);
+    context.font = 'italic 500 31px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
+    drawWrappedText(context, aside, textX, asideY, textWidth, asideLineHeight, maxAsideLines);
   }
 
   context.strokeStyle = "#e7e5e4";
   context.lineWidth = 3;
   context.beginPath();
-  context.moveTo(120, 1200);
-  context.lineTo(960, 1200);
+  context.moveTo(textX, dividerY);
+  context.lineTo(textX + textWidth, dividerY);
   context.stroke();
 
-  drawPawJelly(context, 120, 1220, 58);
+  drawPawJelly(context, textX, footerY - 22, 58);
 
   context.fillStyle = "#0f766e";
-  context.font = '700 42px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  context.fillText("MomentPet", 195, 1260);
+  context.font = '700 42px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
+  context.fillText("MomentPet", textX + 75, footerY + 18);
 
   context.fillStyle = "#a8a29e";
-  context.font = '600 27px Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  context.font = '600 27px "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif';
   context.textAlign = "right";
-  context.fillText("pet mood note", 960, 1258);
+  context.fillText("pet mood note", textX + textWidth, footerY + 16);
   context.textAlign = "left";
+  context.restore();
 
   return canvasToBlob(canvas, "image/png", 1);
 }
@@ -1724,6 +1776,16 @@ function drawWrappedText(
   lineHeight: number,
   maxLines: number,
 ) {
+  const lines = getWrappedTextLines(context, text, maxWidth, maxLines);
+  drawTextLines(context, lines, x, y, lineHeight);
+}
+
+function getWrappedTextLines(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+) {
   const words = text.split(" ");
   const lines: string[] = [];
   let currentLine = "";
@@ -1747,13 +1809,24 @@ function drawWrappedText(
 
   if (currentLine && lines.length < maxLines) lines.push(currentLine);
 
-  lines.slice(0, maxLines).forEach((line, index) => {
+  return lines.slice(0, maxLines).map((line, index) => {
     const isLastVisibleLine = index === maxLines - 1;
     const visibleLine =
-      isLastVisibleLine && didOmitText
-        ? fitTextToWidth(context, line, maxWidth)
-        : line;
-    context.fillText(visibleLine, x, y + lineHeight * index);
+      isLastVisibleLine && didOmitText ? `${line.trimEnd()}...` : line;
+
+    return fitTextToWidth(context, visibleLine, maxWidth);
+  });
+}
+
+function drawTextLines(
+  context: CanvasRenderingContext2D,
+  lines: string[],
+  x: number,
+  y: number,
+  lineHeight: number,
+) {
+  lines.forEach((line, index) => {
+    context.fillText(line, x, y + lineHeight * index);
   });
 }
 

@@ -141,6 +141,14 @@ export async function POST(request: Request) {
 - 호기심/관찰: "주변을 더 확인하고 싶은 마음이 앞선 흐름이에요.", "새로운 환경을 천천히 살펴보는 중일 수 있어요.", "관심이 가는 대상에 시선이 머무는 신호로 읽혀요."
 - 활발함/기대감: "반응을 기다리며 몸의 에너지가 올라온 분위기예요.", "짧은 놀이로 흐름을 받아주면 즐거움이 이어질 수 있어요.", "기대하는 대상 쪽으로 마음이 향해 있어요."
 
+섹션별 표현 확장:
+- mood는 "지금은 편안함 속에서 주변 반응을 가볍게 확인하는 흐름이에요.", "주변을 조심스럽게 확인하며 안정감을 찾는 쪽에 가까워요.", "익숙한 공간 안에서 천천히 분위기를 살피는 장면으로 읽혀요.", "관심 가는 대상에 시선을 두고 차분히 상황을 받아들이고 있어요."처럼 중심 mood를 먼저 잡으세요.
+- signals는 "시선이 머무는 방향과 몸의 힘 조절이 같은 분위기를 만들어요.", "자세가 크게 무너지지 않고 주변을 확인하는 흐름을 이어가요.", "귀와 몸의 방향, 멈춘 시선이 사진의 핵심 단서예요.", "전체적으로 빠른 움직임보다 살피는 쪽에 가까운 장면이에요."처럼 사진 단서와 자연스럽게 연결하세요.
+- possibleReason은 "익숙한 자리에서도 주변 변화가 궁금할 때 비슷한 반응이 나와요.", "편안한 흐름을 유지하면서도 소리나 움직임을 확인하고 싶을 때 자주 보여요.", "새로운 대상이 가까이 있거나 보호자 반응을 기다릴 때 이런 분위기가 생기곤 해요.", "쉬는 흐름과 관찰하려는 마음이 같이 있을 때 이런 장면으로 이어질 수 있어요."처럼 mood와 끊기지 않게 쓰세요.
+- guardianResponse는 "지금 흐름을 방해하지 않게 천천히 기다려 주세요.", "가까이 다가가기보다 스스로 확인할 시간을 남겨두면 충분해요.", "편안한 거리에서 조용히 곁을 지켜주세요.", "반응을 강하게 끌어내지 말고 현재 분위기를 이어가 주세요."처럼 행동 제안의 시작을 다양하게 바꾸세요.
+- caution은 반드시 현재 mood/state와 이어져야 합니다. 차분함, 안정감, 관찰, 단순 호기심이 중심이면 "긴장", "불안", "통증", "아파", "위험" 같은 단어를 쓰지 말고, "주변을 천천히 살필 수 있도록 여유를 주세요.", "지금처럼 편안한 분위기를 유지해 주세요.", "안정감을 느낄 수 있도록 조용한 환경을 이어가 주세요.", "스스로 주변을 확인할 수 있도록 잠시 기다려 주세요."처럼 가볍게 쓰세요.
+- cuteThought는 "여기서 조금 더 둘러보고 싶어.", "이 정도 거리에서 보는 게 편해.", "조용히 살펴보는 중이야.", "지금 분위기가 나쁘지 않아."처럼 짧고 자연스럽게 변주하세요.
+
 cuteThought 규칙:
 - 반려동물의 진짜 생각을 단정하지 말고, 사진을 보고 느껴지는 분위기를 반려동물 시점처럼 짧게 표현하세요.
 - 공유하고 싶을 정도로 자연스러운 한 문장만 쓰고, 따옴표는 넣지 마세요.
@@ -158,6 +166,7 @@ cuteThought 규칙:
 참고 문구 규칙:
 - 질병명 확정, 진단, 치료 지시는 하지 마세요.
 - caution은 화면의 "참고하면 좋아요" 섹션에 들어갑니다. 과하게 무겁지 않게, 보호자가 참고할 한 문장으로만 쓰세요.
+- caution은 반드시 중심 mood/state와 같은 결의 문장이어야 합니다. 본문이 차분함/관찰/안정인데 caution에서 갑자기 긴장, 불안, 통증, 아픔, 위험을 언급하지 마세요.
 - 긴장, 불안, 답답함, 움츠림, 예민함, 경계, 평소와 다른 행동, 회복 중처럼 보이는 분위기에서는 caution을 적극적으로 작성하세요.
 - 긴장/불안이면 "긴장한 반응이 오래 이어진다면 주변 자극을 줄이고 익숙한 공간에서 쉬게 해주세요"처럼 안정 방법 중심으로 쓰세요.
 - 답답함/불편함이면 "불편해 보이는 자세가 계속되면 자리나 주변 환경을 한 번 살펴봐 주세요"처럼 가볍게 안내하세요.
@@ -375,7 +384,70 @@ const cautionFallbacks: Partial<Record<AnalysisMood, string[]>> = {
     "평소보다 오래 처져 보인다면 하루 흐름을 살피고 필요한 경우 도움을 받아보세요.",
     "쉬는 시간이 길어지면서 반응까지 둔해진다면 평소 컨디션과 다른 점이 있는지 확인해보세요.",
   ],
+  curious: [
+    "주변을 천천히 살필 수 있도록 여유를 주는 것도 좋아요.",
+    "스스로 주변을 확인할 수 있도록 잠시 기다려 주세요.",
+    "관심이 머무는 대상을 무리하게 치우기보다 천천히 살펴보게 해주세요.",
+    "새로운 자극을 확인하는 중이라면 편안한 거리에서 지켜봐 주세요.",
+  ],
+  focused: [
+    "관심이 향한 곳을 충분히 확인할 수 있도록 잠시 시간을 주세요.",
+    "시선이 머무는 방향을 따라 조용히 상황을 살펴봐 주세요.",
+    "집중이 이어지는 동안에는 갑자기 부르기보다 부드럽게 반응을 기다려 주세요.",
+    "확인하려는 흐름을 끊지 않도록 편안한 거리를 유지해 주세요.",
+  ],
+  calm: [
+    "지금처럼 편안한 분위기를 유지해 주면 좋아요.",
+    "안정감을 느낄 수 있도록 조용한 환경을 이어가 주세요.",
+    "차분히 머무는 흐름이 이어지도록 큰 자극은 잠시 피해 주세요.",
+    "스스로 주변을 확인할 수 있도록 천천히 기다려 주는 것도 좋아요.",
+  ],
+  neutral: [
+    "주변을 천천히 살필 수 있도록 여유를 주세요.",
+    "지금 흐름을 방해하지 않게 조용히 지켜봐 주세요.",
+    "반응을 서두르기보다 현재 분위기를 조금 더 이어가 주세요.",
+    "스스로 상황을 확인할 수 있도록 편안한 거리를 남겨주세요.",
+  ],
+  active: [
+    "에너지가 올라온 흐름이라면 짧고 안전한 놀이로 받아주세요.",
+    "흥이 이어질 때는 주변 물건을 정리하고 가볍게 움직일 공간을 만들어주세요.",
+    "반응을 기다리는 분위기라면 짧게 놀아주고 쉬는 흐름으로 이어가 주세요.",
+  ],
+  expectant: [
+    "기다리는 흐름이 길어지지 않도록 익숙한 루틴을 차분히 이어가 주세요.",
+    "기대감이 올라와 있다면 차례를 천천히 알려주며 반응을 받아주세요.",
+    "무언가를 기다리는 분위기라면 짧은 말과 익숙한 행동으로 흐름을 정리해 주세요.",
+  ],
 };
+
+const calmReferenceMoods: AnalysisMood[] = [
+  "calm",
+  "curious",
+  "focused",
+  "neutral",
+  "active",
+  "expectant",
+];
+
+const concernWords = [
+  "긴장",
+  "불안",
+  "스트레스",
+  "예민",
+  "경계",
+  "움츠",
+  "놀라",
+  "통증",
+  "아파",
+  "아픔",
+  "호흡",
+  "상처",
+  "절뚝",
+  "구토",
+  "무기력",
+  "공격성",
+  "위험",
+];
 
 function alignCuteThoughtWithMood(analysis: BehaviorAnalysis) {
   const mood = classifyAnalysisMood(analysis);
@@ -390,15 +462,19 @@ function alignCuteThoughtWithMood(analysis: BehaviorAnalysis) {
 
 function alignCautionWithMood(analysis: BehaviorAnalysis) {
   const caution = polishKoreanSentence(analysis.caution);
-  if (caution) return softenCaution(caution);
-
   const mood = classifyAnalysisMood(analysis);
+
+  if (caution) {
+    const softened = softenCaution(caution);
+    if (!cautionConflictsWithMood(softened, mood)) return softened;
+
+    const aligned = pickCautionFallback(mood, getMoodSignalText(analysis));
+    return aligned ?? "";
+  }
+
   if (!shouldAddCautionFallback(mood, analysis)) return "";
 
-  const candidates = cautionFallbacks[mood];
-  if (!candidates?.length) return "";
-
-  return candidates[Math.abs(hashText(getAnalysisText(analysis))) % candidates.length];
+  return pickCautionFallback(mood, getMoodSignalText(analysis)) ?? "";
 }
 
 function shouldAddCautionFallback(mood: AnalysisMood, analysis: BehaviorAnalysis) {
@@ -420,8 +496,41 @@ function shouldAddCautionFallback(mood: AnalysisMood, analysis: BehaviorAnalysis
   ].some((keyword) => text.includes(keyword));
 }
 
+function cautionConflictsWithMood(caution: string, mood: AnalysisMood) {
+  if (!caution) return false;
+
+  if (["tense", "uncomfortable", "alert"].includes(mood)) return false;
+
+  if (mood === "resting") {
+    return hasConcernWords(caution) && !hasRestingConcern(caution);
+  }
+
+  if (calmReferenceMoods.includes(mood)) {
+    return hasConcernWords(caution);
+  }
+
+  return false;
+}
+
+function hasConcernWords(text: string) {
+  return concernWords.some((word) => text.includes(word));
+}
+
+function hasRestingConcern(text: string) {
+  return ["회복", "평소와 다르", "기운이 없", "무기력", "처져", "둔해"].some(
+    (word) => text.includes(word),
+  );
+}
+
+function pickCautionFallback(mood: AnalysisMood, seedText: string) {
+  const candidates = cautionFallbacks[mood];
+  if (!candidates?.length) return null;
+
+  return candidates[Math.abs(hashText(seedText)) % candidates.length];
+}
+
 function classifyAnalysisMood(analysis: BehaviorAnalysis): AnalysisMood {
-  const text = getAnalysisText(analysis);
+  const text = getMoodSignalText(analysis);
   const scores: Record<AnalysisMood, number> = {
     active: scoreText(text, ["활발", "신나", "즐거", "놀이", "놀고", "장난", "에너지", "흥분", "뛰", "꼬리 흔들"]),
     tense: scoreText(text, ["긴장", "불안", "낯설", "조심", "주저", "움츠", "놀람", "스트레스"]),
@@ -508,6 +617,15 @@ function getAnalysisText(analysis: BehaviorAnalysis) {
     analysis.guardianResponse,
     analysis.caution,
     analysis.cuteThought,
+  ].join(" ");
+}
+
+function getMoodSignalText(analysis: BehaviorAnalysis) {
+  return [
+    analysis.mood,
+    analysis.signals,
+    analysis.possibleReason,
+    analysis.guardianResponse,
   ].join(" ");
 }
 
